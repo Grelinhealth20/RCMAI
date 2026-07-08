@@ -25,7 +25,6 @@ export const modules: AIModule[] = [
   { id: 'eligibility-ai', name: 'Eligibility AI', icon: EligibilityIcon, Component: EligibilityAI },
   { id: 'prior-authorization-ai', name: 'Prior Authorization AI', icon: PriorAuthIcon, Component: PriorAuthorizationAI },
   { id: 'coding-ai', name: 'Coding AI', icon: CodingIcon, Component: CodingAI },
-  { id: 'claims-submission-ai', name: 'Claims Submission AI', icon: ClaimsIcon, Component: ClaimsSubmissionAI },
   { id: 'ar-denial-management', name: 'AR & Denial Management', icon: ARDenialIcon, Component: ARDenialManagement },
   { id: 'appeals-ai', name: 'Appeals AI', icon: AppealsIcon, Component: AppealsAI },
   { id: 'performance-ai', name: 'Performance AI', icon: PerformanceIcon, Component: PerformanceAI },
