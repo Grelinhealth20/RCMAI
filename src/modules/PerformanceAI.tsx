@@ -1,7 +1,7 @@
-import ModulePage from './ModulePage'
+import PerformanceDashboard from './performance/PerformanceDashboard'
 
 function PerformanceAI() {
-  return <ModulePage name="Performance AI" />
+  return <PerformanceDashboard />
 }
 
 export default PerformanceAI

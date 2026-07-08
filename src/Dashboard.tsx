@@ -1,7 +1,10 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import logo from './assets/grelin-logo.png'
 import { modules } from './modules/registry'
+import { moduleIdFromPath, pathForModule } from './modules/routing'
 import './Dashboard.css'
+
+const DEFAULT_MODULE = 'eligibility-ai'
 
 interface DashboardProps {
   onLogout: () => void
@@ -10,8 +13,27 @@ interface DashboardProps {
 function Dashboard({ onLogout }: DashboardProps) {
   const [isLoggingOut, setIsLoggingOut] = useState(false)
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
-  // Land on the Eligibility system immediately after login (not a blank dashboard).
-  const [activeModuleId, setActiveModuleId] = useState<string | null>('eligibility-ai')
+  // Each system is deep-linkable at its own path (e.g. /coding-ai). Initialize
+  // from the URL; fall back to the Eligibility system.
+  const [activeModuleId, setActiveModuleId] = useState<string | null>(
+    () => moduleIdFromPath(window.location.pathname) ?? DEFAULT_MODULE,
+  )
+
+  /** Select a module and reflect it in the address bar (adds a history entry). */
+  const selectModule = (id: string) => {
+    setActiveModuleId(id)
+    window.history.pushState({}, '', pathForModule(id))
+  }
+
+  // Keep state in sync with browser back/forward, and canonicalize the initial URL.
+  useEffect(() => {
+    const onPop = () => setActiveModuleId(moduleIdFromPath(window.location.pathname) ?? DEFAULT_MODULE)
+    window.addEventListener('popstate', onPop)
+    const canonical = pathForModule(activeModuleId)
+    if (window.location.pathname !== canonical) window.history.replaceState({}, '', canonical)
+    return () => window.removeEventListener('popstate', onPop)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const handleLogout = () => {
     setIsLoggingOut(true)
@@ -103,7 +125,7 @@ function Dashboard({ onLogout }: DashboardProps) {
                     key={module.id}
                     type="button"
                     className={`sidebar-nav-item${isActive ? ' is-active' : ''}`}
-                    onClick={() => setActiveModuleId(isActive ? null : module.id)}
+                    onClick={() => selectModule(module.id)}
                     title={module.name}
                     aria-current={isActive ? 'page' : undefined}
                   >
