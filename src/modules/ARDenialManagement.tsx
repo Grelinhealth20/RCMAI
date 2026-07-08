@@ -3,9 +3,8 @@ import './priorauth/PriorAuthAI.css'
 import './ARDenialManagement.css'
 import ARDashboard from './ar/ARDashboard'
 import ARIntelligence from './ar/ARIntelligence'
-import ARCalling from './ar/ARCalling'
 
-type ArdTab = 'dashboard' | 'intelligence' | 'calling'
+type ArdTab = 'dashboard' | 'intelligence'
 
 interface TabDef {
   id: ArdTab
@@ -34,18 +33,9 @@ function IntelligenceIcon() {
   )
 }
 
-function CallingIcon() {
-  return (
-    <svg viewBox="0 0 24 24" width="17" height="17" fill="none" aria-hidden="true">
-      <path d="M6.5 4h3l1.3 3.2-2 1.4a11 11 0 004.6 4.6l1.4-2 3.2 1.3v3a1.5 1.5 0 01-1.6 1.5A14 14 0 015 6.6 1.5 1.5 0 016.5 4z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
-    </svg>
-  )
-}
-
 const TABS: TabDef[] = [
   { id: 'dashboard', label: 'Dashboard', hint: 'AR & denial activity overview', Icon: DashboardIcon },
   { id: 'intelligence', label: 'AI Intelligence', hint: 'Denial insight & prediction', Icon: IntelligenceIcon },
-  { id: 'calling', label: 'AI Calling', hint: 'Automated payer follow-up', Icon: CallingIcon },
 ]
 
 function ARDenialManagement() {
@@ -101,7 +91,6 @@ function ARDenialManagement() {
       <main className="pa-content" role="tabpanel" aria-label={active.label}>
         {activeTab === 'dashboard' && <ARDashboard />}
         {activeTab === 'intelligence' && <ARIntelligence />}
-        {activeTab === 'calling' && <ARCalling />}
       </main>
     </div>
   )

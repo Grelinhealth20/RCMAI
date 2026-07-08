@@ -1,5 +1,5 @@
 /* ============================================================================
- * AR Decision Intelligence — light-mode, horizontally-aligned single family tree
+ * AR Decision Intelligence — light, wide, top-down single family tree
  * ==========================================================================*/
 
 .ait {
@@ -21,26 +21,9 @@
   gap: 16px;
   flex-wrap: wrap;
 }
-.ait-bar-titles {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  max-width: 720px;
-}
-.ait-bar-title {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 16px;
-  font-weight: 800;
-  color: var(--navy);
-}
-.ait-bar-sub {
-  font-size: 12.5px;
-  font-weight: 600;
-  color: var(--text-muted);
-  line-height: 1.5;
-}
+.ait-bar-titles { display: flex; flex-direction: column; gap: 4px; max-width: 760px; }
+.ait-bar-title { display: flex; align-items: center; gap: 10px; font-size: 16px; font-weight: 800; color: var(--navy); }
+.ait-bar-sub { font-size: 12.5px; font-weight: 600; color: var(--text-muted); line-height: 1.5; }
 .ait-live {
   display: inline-flex;
   align-items: center;
@@ -53,17 +36,8 @@
   color: var(--teal-accent-bright);
   background: color-mix(in srgb, var(--teal-accent-bright) 14%, var(--white));
 }
-.ait-live-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--teal-accent-bright);
-  animation: ait-pulse 1.4s ease-in-out infinite;
-}
-.ait-bar-actions {
-  display: flex;
-  gap: 10px;
-}
+.ait-live-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--teal-accent-bright); animation: ait-pulse 1.4s ease-in-out infinite; }
+.ait-bar-actions { display: flex; gap: 10px; }
 .ait-btn {
   display: inline-flex;
   align-items: center;
@@ -78,77 +52,96 @@
   cursor: pointer;
   transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease, filter 0.15s ease;
 }
-.ait-btn:hover:not(:disabled) {
-  border-color: var(--blue-accent);
-  color: var(--blue-accent);
-  background: var(--surface-tint);
-}
+.ait-btn:hover:not(:disabled) { border-color: var(--blue-accent); color: var(--blue-accent); background: var(--surface-tint); }
 .ait-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .ait-btn-primary {
   border: none;
   color: var(--white);
-  background: linear-gradient(135deg, var(--blue-accent-2, var(--blue-accent)), var(--navy));
+  background: linear-gradient(135deg, #2f6fe0, #1b2a6b);
   box-shadow: 0 5px 14px rgba(39, 83, 179, 0.3);
 }
 .ait-btn-primary:hover:not(:disabled) { filter: brightness(1.06); color: var(--white); }
 
 /* ============================================================================
- * The tree — light panel, horizontal flow
+ * Tree panel
  * ==========================================================================*/
-
 .ait-tree {
   border-radius: 18px;
   border: 1px solid var(--border-strong);
-  background: linear-gradient(180deg, var(--surface-tint) 0%, var(--white) 100%);
-  padding: 24px 22px;
-  overflow-x: auto;
+  background: linear-gradient(180deg, var(--surface-tint) 0%, var(--white) 55%);
+  padding: 28px 28px 34px;
   box-shadow: 0 1px 2px rgba(9, 17, 33, 0.04), 0 10px 26px rgba(9, 17, 33, 0.05);
+  overflow-x: auto;
+}
+.ait-col { display: flex; flex-direction: column; align-items: center; width: 100%; min-width: 720px; }
+.ait-center { display: flex; justify-content: center; width: 100%; }
+
+/* Vertical stem between sections */
+.ait-stem {
+  width: 2px;
+  height: 26px;
+  background: linear-gradient(180deg, rgba(120, 155, 220, 0.2), var(--ait-line));
+}
+.ait-tree.is-running .ait-stem {
+  background: linear-gradient(180deg, var(--blue-accent), var(--teal-accent-bright));
+  background-size: 100% 200%;
+  animation: ait-flow-y 1.1s linear infinite;
 }
 
-/* Left-to-right lineage: root → stages → router → (branch) → queues */
-.ait-flow {
-  display: inline-flex;
-  align-items: center;
-  gap: 0;
-  min-width: max-content;
+/* Band of four cards with org-chart connectors */
+.ait-band {
+  position: relative;
+  display: grid;
+  gap: 18px;
+  width: 100%;
+  padding-top: 26px;
 }
+.ait-band-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+/* Horizontal bus spanning the four child centers (12.5% … 87.5%) */
+.ait-band::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 12.5%;
+  right: 12.5%;
+  height: 2px;
+  background: var(--ait-line);
+}
+/* Vertical drop from the bus to each card */
+.ait-band > .ait-node::before {
+  content: '';
+  position: absolute;
+  top: -26px;
+  left: 50%;
+  width: 2px;
+  height: 26px;
+  background: var(--ait-line);
+  transform: translateX(-50%);
+}
+.ait-tree.is-running .ait-band::before,
+.ait-tree.is-running .ait-band > .ait-node::before { background: var(--blue-accent); }
 
 .ait-node {
   position: relative;
   z-index: 1;
-  flex: none;
   border-radius: 13px;
   border: 1.5px solid var(--border-strong);
   background: var(--white);
-}
-
-/* Horizontal connector between spine nodes */
-.ait-hlink {
-  flex: none;
-  width: 26px;
-  height: 2px;
-  align-self: center;
-  background: var(--ait-line);
-}
-.ait-tree.is-running .ait-hlink {
-  background: linear-gradient(90deg, var(--blue-accent), var(--teal-accent-bright));
-  background-size: 200% 100%;
-  animation: ait-flow-x 1.1s linear infinite;
 }
 
 /* ---------- Root ---------- */
 .ait-root {
   display: flex;
   align-items: center;
-  gap: 13px;
-  padding: 14px 16px;
-  width: 232px;
+  gap: 14px;
+  padding: 15px 22px;
+  min-width: 300px;
 }
 .ait-ring {
   --pct: 0%;
   flex: none;
-  width: 56px;
-  height: 56px;
+  width: 58px;
+  height: 58px;
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -157,8 +150,8 @@
   transition: background 0.4s ease;
 }
 .ait-ring-inner {
-  width: 44px;
-  height: 44px;
+  width: 46px;
+  height: 46px;
   border-radius: 50%;
   background: var(--white);
   display: flex;
@@ -167,21 +160,20 @@
   justify-content: center;
   line-height: 1;
 }
-.ait-ring-num { font-size: 16px; font-weight: 800; color: var(--navy); }
+.ait-ring-num { font-size: 17px; font-weight: 800; color: var(--navy); }
 .ait-ring-den { font-size: 9.5px; font-weight: 700; color: var(--text-muted); }
 .ait-root-text { display: flex; flex-direction: column; gap: 2px; }
-.ait-root-title { font-size: 13.5px; font-weight: 800; color: var(--navy); }
+.ait-root-title { font-size: 14px; font-weight: 800; color: var(--navy); }
 .ait-root-sub { font-size: 11px; font-weight: 700; color: var(--teal-accent-bright); }
 .ait-root-meta { font-size: 10.5px; font-weight: 600; color: var(--text-muted); }
 
 /* ---------- Stage cards ---------- */
 .ait-stage {
-  width: 210px;
   align-self: stretch;
-  padding: 12px 13px;
+  padding: 14px 15px;
   display: flex;
   flex-direction: column;
-  gap: 9px;
+  gap: 11px;
   transition: border-color 0.25s ease, box-shadow 0.25s ease, background 0.25s ease;
 }
 .ait-stage.is-live { background: var(--surface-tint); }
@@ -193,9 +185,9 @@
 .ait-stage-head { display: flex; align-items: center; gap: 10px; }
 .ait-stage-idx {
   flex: none;
-  width: 24px;
-  height: 24px;
-  border-radius: 7px;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -206,7 +198,7 @@
   border: 1px solid rgba(39, 83, 179, 0.28);
 }
 .ait-stage-titles { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
-.ait-stage-name { font-size: 12.5px; font-weight: 800; color: var(--navy); line-height: 1.2; }
+.ait-stage-name { font-size: 13px; font-weight: 800; color: var(--navy); line-height: 1.2; }
 .ait-stage-cap {
   font-size: 9.5px;
   font-weight: 700;
@@ -217,35 +209,31 @@
 .ait-substeps {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
   margin: 0;
-  padding: 9px 0 0;
+  padding: 11px 0 0;
   list-style: none;
   border-top: 1px dashed var(--border);
 }
 .ait-substep {
   display: flex;
-  align-items: center;
-  gap: 7px;
-  font-size: 11px;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 11.5px;
   font-weight: 600;
   color: var(--navy);
-  line-height: 1.25;
+  line-height: 1.3;
 }
 .ait-substep-dot {
   flex: none;
   width: 6px;
   height: 6px;
+  margin-top: 5px;
   border-radius: 50%;
   background: var(--teal-accent-bright);
 }
 .ait-stage-tally { display: flex; gap: 6px; padding-top: 2px; }
-.tly {
-  font-size: 10.5px;
-  font-weight: 900;
-  padding: 2px 8px;
-  border-radius: 999px;
-}
+.tly { font-size: 10.5px; font-weight: 900; padding: 2px 8px; border-radius: 999px; }
 .tly-pass { color: #0a6b4e; background: rgba(18, 158, 110, 0.14); }
 .tly-flag { color: #8a5a00; background: rgba(217, 119, 6, 0.16); }
 .tly-fail { color: var(--danger); background: var(--danger-bg); }
@@ -254,17 +242,16 @@
 .ait-router {
   display: flex;
   align-items: center;
-  gap: 11px;
-  padding: 13px 15px;
-  width: 176px;
+  gap: 12px;
+  padding: 13px 24px;
   border-color: var(--blue-accent);
   background: rgba(39, 83, 179, 0.06);
 }
 .ait-router-icon {
   flex: none;
-  width: 32px;
-  height: 32px;
-  border-radius: 9px;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -273,90 +260,43 @@
   border: 1px solid rgba(39, 83, 179, 0.3);
 }
 .ait-router-text { display: flex; flex-direction: column; gap: 2px; }
-.ait-router-title { font-size: 12.5px; font-weight: 800; color: var(--navy); }
-.ait-router-sub { font-size: 10.5px; font-weight: 700; color: var(--text-muted); }
+.ait-router-title { font-size: 13.5px; font-weight: 800; color: var(--navy); }
+.ait-router-sub { font-size: 11px; font-weight: 700; color: var(--text-muted); }
 
-/* ---------- Branch connector (router → stacked queues) ---------- */
-.ait-branch {
-  flex: none;
-  width: 30px;
-  height: 2px;
-  align-self: center;
-  background: var(--ait-line);
-}
-.ait-tree.is-running .ait-branch {
-  background: linear-gradient(90deg, var(--blue-accent), var(--teal-accent-bright));
-}
-
-/* ---------- Queues (leaves) — vertical stack with org-chart connectors ---------- */
-.ait-queues {
-  position: relative;
-  flex: none;
+/* ---------- Queue cards ---------- */
+.ait-queue {
+  --qc: var(--blue-accent);
+  align-self: stretch;
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding-left: 26px;
-  width: 340px;
-}
-/* Vertical bus */
-.ait-queues::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 12%;
-  bottom: 12%;
-  width: 2px;
-  background: var(--ait-line);
-}
-.ait-queue {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 11px 13px;
-  border-radius: 12px;
-  border: 1.5px solid var(--border-strong);
-  border-left: 4px solid var(--qc, var(--blue-accent));
-  background: var(--white);
-}
-/* Horizontal drop from the bus to each queue */
-.ait-queue::before {
-  content: '';
-  position: absolute;
-  left: -26px;
-  top: 50%;
-  width: 26px;
-  height: 2px;
-  background: var(--ait-line);
-  transform: translateY(-50%);
+  gap: 7px;
+  padding: 13px 14px;
+  border-left: 4px solid var(--qc);
 }
 .ait-queue.q-appeal { --qc: var(--q-appeal); }
 .ait-queue.q-calling { --qc: var(--q-calling); }
 .ait-queue.q-resubmit { --qc: var(--q-resubmit); }
 .ait-queue.q-manual { --qc: var(--q-manual); }
-
-.ait-queue-main { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
-.ait-queue-head { display: flex; align-items: center; gap: 8px; }
+.ait-queue-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .ait-queue-label { font-size: 12.5px; font-weight: 800; color: var(--navy); }
 .ait-queue-count {
-  min-width: 24px;
+  min-width: 26px;
   text-align: center;
-  padding: 1px 8px;
+  padding: 2px 9px;
   border-radius: 999px;
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 900;
   color: var(--white);
-  background: var(--qc, var(--blue-accent));
+  background: var(--qc);
 }
-.ait-queue-blurb { font-size: 10.5px; font-weight: 600; color: var(--text-muted); line-height: 1.3; }
-.ait-queue-chips { display: flex; flex-wrap: wrap; gap: 5px; justify-content: flex-end; max-width: 150px; }
+.ait-queue-blurb { font-size: 10.5px; font-weight: 600; color: var(--text-muted); line-height: 1.35; min-height: 28px; }
+.ait-queue-chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .ait-queue-empty { font-size: 10.5px; font-weight: 700; color: var(--text-faint); font-style: italic; }
 .ait-chip {
-  padding: 4px 8px;
+  padding: 4px 9px;
   border-radius: 7px;
-  border: 1px solid color-mix(in srgb, var(--qc, var(--blue-accent)) 45%, transparent);
-  background: color-mix(in srgb, var(--qc, var(--blue-accent)) 12%, var(--white));
+  border: 1px solid color-mix(in srgb, var(--qc) 45%, transparent);
+  background: color-mix(in srgb, var(--qc) 12%, var(--white));
   color: var(--navy);
   font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
   font-size: 11px;
@@ -370,7 +310,6 @@
 /* ============================================================================
  * Claim detail modal (light)
  * ==========================================================================*/
-
 .ait-detail-overlay {
   position: fixed;
   inset: 0;
@@ -384,7 +323,7 @@
 }
 .ait-detail {
   --qc: var(--blue-accent);
-  width: 620px;
+  width: 640px;
   max-width: 100%;
   max-height: 88vh;
   overflow-y: auto;
@@ -402,19 +341,11 @@
 .ait-detail.q-calling { --qc: var(--q-calling); }
 .ait-detail.q-resubmit { --qc: var(--q-resubmit); }
 .ait-detail.q-manual { --qc: var(--q-manual); }
-
 .ait-detail-head { display: flex; align-items: center; gap: 12px; }
 .ait-detail-titles { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
 .ait-detail-id { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 13.5px; font-weight: 800; color: var(--navy); }
 .ait-detail-meta { font-size: 11.5px; font-weight: 600; color: var(--text-muted); }
-.ait-detail-queue {
-  padding: 4px 12px;
-  border-radius: 999px;
-  font-size: 11px;
-  font-weight: 900;
-  color: var(--white);
-  background: var(--qc);
-}
+.ait-detail-queue { padding: 4px 12px; border-radius: 999px; font-size: 11px; font-weight: 900; color: var(--white); background: var(--qc); }
 .ait-detail-close {
   flex: none;
   width: 28px;
@@ -427,7 +358,6 @@
   cursor: pointer;
 }
 .ait-detail-close:hover { background: var(--navy); color: var(--white); }
-
 .ait-detail-signal {
   padding: 10px 12px;
   border-radius: 10px;
@@ -447,7 +377,6 @@
   color: var(--text-muted);
   margin-bottom: 3px;
 }
-
 .ait-detail-stages { display: flex; flex-direction: column; gap: 9px; }
 .ait-detail-stage { display: flex; gap: 10px; align-items: flex-start; }
 .ait-detail-stage-dot {
@@ -480,7 +409,6 @@
   background: var(--surface-tint);
   border: 1px solid var(--border);
 }
-
 .ait-detail-outcome {
   display: flex;
   flex-direction: column;
@@ -515,16 +443,13 @@
 }
 @keyframes ait-spin-kf { to { transform: rotate(360deg); } }
 @keyframes ait-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
-@keyframes ait-flow-x { to { background-position: -200% 0; } }
+@keyframes ait-flow-y { to { background-position: 0 -200%; } }
 @keyframes ait-breathe {
   0%, 100% { box-shadow: 0 0 0 3px rgba(39, 83, 179, 0.1); }
   50% { box-shadow: 0 0 0 3px rgba(39, 83, 179, 0.2); }
 }
-@keyframes ait-pop {
-  from { opacity: 0; transform: scale(0.7) translateY(-4px); }
-  to { opacity: 1; transform: scale(1) translateY(0); }
-}
+@keyframes ait-pop { from { opacity: 0; transform: scale(0.7) translateY(-4px); } to { opacity: 1; transform: scale(1) translateY(0); } }
 
 @media (prefers-reduced-motion: reduce) {
-  .ait-live-dot, .ait-spin, .ait-stage.is-active, .ait-tree.is-running .ait-hlink, .ait-chip { animation: none; }
+  .ait-live-dot, .ait-spin, .ait-stage.is-active, .ait-tree.is-running .ait-stem, .ait-chip { animation: none; }
 }

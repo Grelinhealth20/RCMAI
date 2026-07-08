@@ -1,4 +1,4 @@
-import { Fragment, useMemo, useState, type CSSProperties } from 'react'
+import { useMemo, useState, type CSSProperties } from 'react'
 import { INTAKE_QUEUE, type DecisionQueue, type IntakeClaim } from './engine/intakeEngine'
 import { fmtUSD } from './engine/money'
 import { routeClaim, PIPELINE_STAGES, QUEUE_LABEL, type IntelligenceDecision, type StageStatus } from './api/arIntelligenceApi'
@@ -12,13 +12,47 @@ interface ClaimUI {
   error?: string
 }
 
-/** Detailed sub-steps surfaced inside each pipeline stage (provider-readable). */
+/** Detailed, enterprise validation rules surfaced inside each pipeline stage —
+ *  27 rules across the four stages, aligned vertically for the provider. */
 const STAGE_SUBSTEPS: Record<string, string[]> = {
-  eligibility: ['Member active on date of service', 'Plan & benefit verification', 'Coordination of benefits (COB)'],
-  'claim-status': ['Clearinghouse acceptance (277CA)', 'Payer receipt confirmation', 'Adjudication state & AR aging'],
-  remittance: ['Electronic remittance (835) posting', 'CARC denial-reason parse', 'RARC remark-code parse'],
-  rules: ['NCCI PTP / MUE edits', 'Timely-filing window check', 'Prior-authorization & medical necessity'],
+  eligibility: [
+    'Member active on date of service',
+    'Plan & benefit verification',
+    'Coordination of benefits (COB) order',
+    'Coverage effective / termination dates',
+    'Group & plan-type validation',
+    'Subscriber–dependent relationship match',
+  ],
+  'claim-status': [
+    'Clearinghouse acceptance (277CA)',
+    'Payer receipt confirmation',
+    'Adjudication state & AR aging',
+    'Duplicate-claim screening',
+    'Payer claim control number match',
+    'Claim frequency / resubmission code',
+    '999 functional acknowledgment reconciliation',
+  ],
+  remittance: [
+    'Electronic remittance (835) posting',
+    'CARC denial-reason parse',
+    'RARC remark-code parse',
+    'Adjustment group code (CO / PR / OA)',
+    'Allowed vs. billed reconciliation',
+    'Patient-responsibility validation',
+    'Appeal rights & deadline extraction',
+  ],
+  rules: [
+    'NCCI PTP / MUE edit check',
+    'Timely-filing window check',
+    'Prior-authorization & medical necessity',
+    'Modifier appropriateness (25 / 59 / X{EPSU})',
+    'Diagnosis-to-procedure linkage',
+    'LCD / NCD coverage policy match',
+    'Place-of-service & fee-schedule check',
+  ],
 }
+
+const TOTAL_RULES = Object.values(STAGE_SUBSTEPS).reduce((n, s) => n + s.length, 0)
 
 const QUEUE_ORDER: DecisionQueue[] = ['appeal', 'calling', 'resubmission', 'manual']
 
@@ -77,7 +111,6 @@ function ARIntelligence() {
   const processed = useMemo(() => Object.values(ui).filter((u) => u.phase === 'done').length, [ui])
   const pct = Math.round((processed / total) * 100)
 
-  // Live per-stage tally across all routed claims.
   const stageTally = useMemo(() => {
     return PIPELINE_STAGES.map((_, i) => {
       const t = { pass: 0, flag: 0, fail: 0 }
@@ -91,7 +124,6 @@ function ARIntelligence() {
     })
   }, [ui])
 
-  // Routed claims grouped by queue (the leaves of the tree).
   const byQueue = useMemo(() => {
     const map: Record<DecisionQueue, IntakeClaim[]> = { appeal: [], calling: [], resubmission: [], manual: [] }
     INTAKE_QUEUE.forEach((c) => {
@@ -117,8 +149,8 @@ function ARIntelligence() {
             </span>
           </span>
           <span className="ait-bar-sub">
-            A single, centralized decision tree — every claim flows left to right through the validation pipeline and its
-            sub-steps, then branches to the correct decision queue for your team.
+            A single, centralized decision tree — every claim runs through {TOTAL_RULES} enterprise validation rules across four
+            processing stages, then branches to the correct decision queue for your team.
           </span>
         </div>
         <div className="ait-bar-actions">
@@ -137,43 +169,46 @@ function ARIntelligence() {
         </div>
       </div>
 
-      {/* ---------- The single horizontal family tree ---------- */}
+      {/* ---------- The single top-down family tree ---------- */}
       <div className={`ait-tree${running ? ' is-running' : ''}`}>
-        <div className="ait-flow">
+        <div className="ait-col">
           {/* Root */}
-          <div className="ait-node ait-root">
-            <span className="ait-ring" style={{ '--pct': `${pct}%` } as CSSProperties}>
-              <span className="ait-ring-inner">
-                <span className="ait-ring-num">{processed}</span>
-                <span className="ait-ring-den">/ {total}</span>
+          <div className="ait-center">
+            <div className="ait-node ait-root">
+              <span className="ait-ring" style={{ '--pct': `${pct}%` } as CSSProperties}>
+                <span className="ait-ring-inner">
+                  <span className="ait-ring-num">{processed}</span>
+                  <span className="ait-ring-den">/ {total}</span>
+                </span>
               </span>
-            </span>
-            <div className="ait-root-text">
-              <span className="ait-root-title">AI Validation Engine</span>
-              <span className="ait-root-sub">
-                {running ? 'Processing intake…' : processed === total && processed > 0 ? 'All claims routed' : 'Claim intake'}
-              </span>
-              <span className="ait-root-meta">{total} pending claims</span>
+              <div className="ait-root-text">
+                <span className="ait-root-title">AI Validation Engine</span>
+                <span className="ait-root-sub">
+                  {running ? 'Processing intake…' : processed === total && processed > 0 ? 'All claims routed' : 'Claim intake'}
+                </span>
+                <span className="ait-root-meta">{total} pending claims · {TOTAL_RULES} rules</span>
+              </div>
             </div>
           </div>
 
-          <div className="ait-hlink" aria-hidden="true" />
+          <div className="ait-stem" aria-hidden="true" />
 
-          {/* Pipeline stages (horizontal spine) */}
-          {PIPELINE_STAGES.map((stage, i) => {
-            const t = stageTally[i]
-            return (
-              <Fragment key={stage.key}>
-                <div className={`ait-node ait-stage${running ? ' is-active' : ''}${processed > 0 ? ' is-live' : ''}`}>
+          {/* Stage band — four stages side by side, sub-steps aligned vertically */}
+          <div className="ait-band ait-band-4">
+            {PIPELINE_STAGES.map((stage, i) => {
+              const t = stageTally[i]
+              const subs = STAGE_SUBSTEPS[stage.key]
+              return (
+                <div key={stage.key} className={`ait-node ait-stage${running ? ' is-active' : ''}${processed > 0 ? ' is-live' : ''}`}>
                   <div className="ait-stage-head">
                     <span className="ait-stage-idx">{i + 1}</span>
                     <div className="ait-stage-titles">
                       <span className="ait-stage-name">{stage.label}</span>
-                      <span className="ait-stage-cap">{stage.caption}</span>
+                      <span className="ait-stage-cap">{stage.caption} · {subs.length} rules</span>
                     </div>
                   </div>
                   <ul className="ait-substeps">
-                    {STAGE_SUBSTEPS[stage.key].map((s) => (
+                    {subs.map((s) => (
                       <li key={s} className="ait-substep">
                         <span className="ait-substep-dot" aria-hidden="true" />
                         {s}
@@ -188,41 +223,41 @@ function ARIntelligence() {
                     </div>
                   )}
                 </div>
-                <div className="ait-hlink" aria-hidden="true" />
-              </Fragment>
-            )
-          })}
+              )
+            })}
+          </div>
+
+          <div className="ait-stem" aria-hidden="true" />
 
           {/* Router */}
-          <div className="ait-node ait-router">
-            <span className="ait-router-icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24" width="18" height="18" fill="none">
-                <path d="M4 12h6M10 12l4-6h6M10 12l4 6h6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                <circle cx="4" cy="12" r="1.6" fill="currentColor" />
-              </svg>
-            </span>
-            <div className="ait-router-text">
-              <span className="ait-router-title">AI Decision Router</span>
-              <span className="ait-router-sub">{processed}/{total} routed</span>
+          <div className="ait-center">
+            <div className="ait-node ait-router">
+              <span className="ait-router-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none">
+                  <path d="M4 12h6M10 12l4-6h6M10 12l4 6h6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                  <circle cx="4" cy="12" r="1.6" fill="currentColor" />
+                </svg>
+              </span>
+              <div className="ait-router-text">
+                <span className="ait-router-title">AI Decision Router</span>
+                <span className="ait-router-sub">{processed} of {total} claims routed by rules + AI</span>
+              </div>
             </div>
           </div>
 
-          {/* Branch connector into the stacked queues */}
-          <div className="ait-branch" aria-hidden="true" />
+          <div className="ait-stem" aria-hidden="true" />
 
-          {/* Queues (leaves) — stacked vertically on the right */}
-          <div className="ait-queues">
+          {/* Queues band — four decision queues */}
+          <div className="ait-band ait-band-4">
             {QUEUE_ORDER.map((q) => {
               const claims = byQueue[q]
               return (
-                <div key={q} className={`ait-queue ${QUEUE_META[q].cls}`}>
-                  <div className="ait-queue-main">
-                    <div className="ait-queue-head">
-                      <span className="ait-queue-label">{QUEUE_LABEL[q]}</span>
-                      <span className="ait-queue-count">{claims.length}</span>
-                    </div>
-                    <span className="ait-queue-blurb">{QUEUE_META[q].blurb}</span>
+                <div key={q} className={`ait-node ait-queue ${QUEUE_META[q].cls}`}>
+                  <div className="ait-queue-head">
+                    <span className="ait-queue-label">{QUEUE_LABEL[q]}</span>
+                    <span className="ait-queue-count">{claims.length}</span>
                   </div>
+                  <span className="ait-queue-blurb">{QUEUE_META[q].blurb}</span>
                   <div className="ait-queue-chips">
                     {claims.length === 0 ? (
                       <span className="ait-queue-empty">{running ? 'routing…' : 'awaiting'}</span>
@@ -247,7 +282,7 @@ function ARIntelligence() {
         </div>
       </div>
 
-      {/* ---------- Claim detail popover (very detailed steps) ---------- */}
+      {/* ---------- Claim detail popover ---------- */}
       {selected && selectedUi?.phase === 'done' && selectedUi.decision && (
         <div className="ait-detail-overlay" role="dialog" aria-modal="true" onClick={() => setSelectedId(null)}>
           <div className={`ait-detail ${QUEUE_META[selectedUi.decision.queue].cls}`} onClick={(e) => e.stopPropagation()}>

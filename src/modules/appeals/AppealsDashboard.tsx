@@ -14,6 +14,8 @@ type CardKey = AppealStatus | 'all'
 
 const FILTER_EXAMPLES = ['appeals yet to process', 'sent Aetna appeals', 'in process CO-197 denials', 'UnitedHealthcare appeals']
 
+const PAGE_SIZE = 10
+
 const statusBadge: Record<AppealStatus, string> = {
   sent: 'apl-b-sent',
   'in-process': 'apl-b-process',
@@ -61,6 +63,7 @@ interface CardDef {
 function AppealsDashboard({ rows, onSendToEngine }: Props) {
   const [cardStatus, setCardStatus] = useState<CardKey>('all')
   const [detail, setDetail] = useState<AppealRow | null>(null)
+  const [page, setPage] = useState(1)
 
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState<AppealsFilter | null>(null)
@@ -88,6 +91,15 @@ function AppealsDashboard({ rows, onSendToEngine }: Props) {
     return applyAppealsFilter(base, filter)
   }, [rows, cardStatus, filter])
 
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
+  const clampedPage = Math.min(page, totalPages)
+  const pageRows = filtered.slice((clampedPage - 1) * PAGE_SIZE, clampedPage * PAGE_SIZE)
+
+  const selectCard = (key: CardKey) => {
+    setCardStatus(key)
+    setPage(1)
+  }
+
   const runFilter = (raw?: string) => {
     const q = (raw ?? query).trim()
     if (raw !== undefined) setQuery(raw)
@@ -106,6 +118,7 @@ function AppealsDashboard({ rows, onSendToEngine }: Props) {
       .then((f) => {
         setFilter(f)
         setAppliedLabel(q)
+        setPage(1)
       })
       .catch((err: unknown) => {
         if (err instanceof DOMException && err.name === 'AbortError') return
@@ -119,6 +132,7 @@ function AppealsDashboard({ rows, onSendToEngine }: Props) {
     setFilter(null)
     setAppliedLabel('')
     setFilterErr('')
+    setPage(1)
   }
 
   return (
@@ -130,7 +144,7 @@ function AppealsDashboard({ rows, onSendToEngine }: Props) {
             key={c.key}
             type="button"
             className={`apl-card tone-${c.tone}${cardStatus === c.key ? ' is-active' : ''}`}
-            onClick={() => setCardStatus(c.key)}
+            onClick={() => selectCard(c.key)}
           >
             <span className="apl-card-icon">
               <c.Icon />
@@ -233,7 +247,7 @@ function AppealsDashboard({ rows, onSendToEngine }: Props) {
                 </td>
               </tr>
             ) : (
-              filtered.map((r) => (
+              pageRows.map((r) => (
                 <tr key={r.id}>
                   <td className="apl-mono">{r.patientId}</td>
                   <td>{r.inputs.patientName}</td>
@@ -262,6 +276,20 @@ function AppealsDashboard({ rows, onSendToEngine }: Props) {
           </tbody>
         </table>
       </div>
+
+      {filtered.length > PAGE_SIZE && (
+        <div className="apl-pagination">
+          <button type="button" className="apl-page-btn" disabled={clampedPage <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
+            ← Prev
+          </button>
+          <span className="apl-page-info">
+            Page <strong>{clampedPage}</strong> of <strong>{totalPages}</strong>
+          </span>
+          <button type="button" className="apl-page-btn" disabled={clampedPage >= totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))}>
+            Next →
+          </button>
+        </div>
+      )}
 
       {/* ---------- Detail modal ---------- */}
       {detail && (

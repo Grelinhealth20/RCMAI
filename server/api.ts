@@ -1890,7 +1890,9 @@ The "letter" MUST be a professional, submission-ready letter containing, in orde
 
 STRICT RULES:
 - Use ONLY the provided data. NEVER invent patient facts, dates, dollar amounts, identifiers, NPIs, or specific policy/reference numbers. If a needed field is missing, write it in natural professional prose using a clearly bracketed placeholder like "[Member ID]" so staff can fill it — do not fabricate a value.
-- Do not include any markdown, headings with '#', bullets, or tables — produce clean letter prose with paragraph breaks only.
+- STRUCTURE the body with clear labeled section headers, each on its OWN line, followed by its content on the next line(s), with a blank line between sections. Use exactly these section labels in this order: "Basis for Denial:", "Grounds for Appeal:", "Supporting Documentation:", "Requested Action:". Keep the date line, address block, "RE:" block, and salutation above these sections, and the closing/signature block below them.
+- Make "Grounds for Appeal:" thorough — 3 to 5 substantive paragraphs of coding-, policy-, and medical-necessity-based argument tailored to the specific denial.
+- Do not include any markdown, '#' headings, bullets, asterisks, or tables — clean letter prose only.
 - Confident, precise, respectful professional tone. Complete and ready to sign.`
 
     const openaiRes = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -1899,7 +1901,7 @@ STRICT RULES:
       body: JSON.stringify({
         model: 'gpt-4.1',
         temperature: 0.25,
-        max_tokens: 3000,
+        max_tokens: 3600,
         response_format: { type: 'json_object' },
         messages: [
           { role: 'system', content: systemPrompt },
