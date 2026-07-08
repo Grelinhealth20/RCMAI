@@ -1,0 +1,127 @@
+/* Step 1 (Patient & Payer) specific styles.
+   Shared form system lives in stepForm.css. */
+
+.ppf-ai-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 4px;
+  padding: 2px 8px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.3px;
+  color: var(--teal-accent-bright);
+  background: rgba(18, 135, 158, 0.1);
+  border: 1px solid rgba(18, 135, 158, 0.28);
+  border-radius: 999px;
+  text-transform: uppercase;
+}
+
+/* ---------- Payer lookup status ---------- */
+
+.ppf-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.2px;
+  text-transform: none;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+
+.ppf-status-loading {
+  color: var(--blue-accent);
+  background: rgba(39, 83, 179, 0.1);
+}
+
+.ppf-status-verified {
+  color: var(--success);
+  background: rgba(0, 62, 45, 0.09);
+}
+
+.ppf-status-estimate {
+  color: #8a5a00;
+  background: rgba(255, 158, 0, 0.16);
+}
+
+.ppf-status-muted {
+  color: var(--text-muted);
+  background: var(--surface-tint-strong);
+}
+
+.ppf-status-err {
+  color: var(--danger);
+  background: var(--danger-bg);
+}
+
+.ppf-status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.ppf-spinner {
+  width: 11px;
+  height: 11px;
+  border: 2px solid rgba(39, 83, 179, 0.3);
+  border-top-color: var(--blue-accent);
+  border-radius: 50%;
+  animation: ppf-spin 0.7s linear infinite;
+}
+
+@keyframes ppf-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ---------- Provenance banner ---------- */
+
+.ppf-provenance {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 9px 12px;
+  border-radius: 9px;
+  font-size: 11.5px;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.ppf-provenance svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.ppf-provenance strong {
+  font-weight: 800;
+}
+
+.ppf-provenance.is-verified {
+  color: var(--success);
+  background: rgba(0, 62, 45, 0.07);
+  border: 1px solid rgba(0, 62, 45, 0.2);
+}
+
+.ppf-provenance.is-unverified {
+  color: #8a5a00;
+  background: rgba(255, 158, 0, 0.1);
+  border: 1px solid rgba(255, 158, 0, 0.4);
+}
+
+.ppf-sources {
+  display: block;
+  margin-top: 4px;
+  font-size: 10.5px;
+  opacity: 0.9;
+}
+
+.ppf-sources a {
+  color: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+}

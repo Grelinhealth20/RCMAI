@@ -1,0 +1,374 @@
+/* Step 5 (Documents Upload) */
+
+.docs {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 24px 28px 28px;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* ---------- Header ---------- */
+
+.docs-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+  padding-bottom: 16px;
+  border-bottom: 2px solid var(--border-strong);
+}
+
+.docs-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: -0.2px;
+  color: var(--navy);
+}
+
+.docs-sub {
+  margin: 4px 0 0;
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.5;
+  color: var(--text-muted);
+  max-width: 640px;
+}
+
+.docs-sub strong {
+  color: var(--blue-accent);
+  font-weight: 800;
+}
+
+.docs-header-side {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.docs-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.docs-status-loading {
+  color: var(--blue-accent);
+}
+
+.docs-status-err {
+  color: var(--danger);
+}
+
+.docs-regen {
+  padding: 8px 14px;
+  border: 1.5px solid var(--border-strong);
+  border-radius: 9px;
+  background: var(--white);
+  color: var(--navy);
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.docs-regen:hover {
+  border-color: var(--blue-accent);
+  background: var(--surface-tint);
+}
+
+/* ---------- Submission progress ---------- */
+
+.docs-progress {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-shrink: 0;
+  padding: 12px 16px;
+  border: 1.5px solid var(--border-strong);
+  border-radius: 12px;
+  background: var(--surface-tint);
+}
+
+.docs-progress.is-ready {
+  border-color: rgba(0, 62, 45, 0.3);
+  background: rgba(0, 62, 45, 0.06);
+}
+
+.docs-progress-bar {
+  flex: 1;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--border-strong);
+  overflow: hidden;
+}
+
+.docs-progress-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--blue-accent), var(--teal-accent-bright));
+  transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.docs-progress.is-ready .docs-progress-fill {
+  background: linear-gradient(90deg, var(--success-live), var(--success));
+}
+
+.docs-progress-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.docs-progress.is-ready .docs-progress-label {
+  color: var(--success);
+}
+
+/* ---------- Document grid ---------- */
+
+.docs-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  flex-shrink: 0;
+}
+
+.doc-card {
+  display: flex;
+  flex-direction: column;
+  padding: 16px 18px 18px;
+  border: 1.5px solid var(--border-strong);
+  border-radius: 14px;
+  background: var(--white);
+  box-shadow: 0 1px 2px rgba(9, 17, 33, 0.04), 0 6px 16px rgba(9, 17, 33, 0.05);
+  animation: doc-rise 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.doc-card.is-filled {
+  border-color: rgba(0, 62, 45, 0.35);
+}
+
+@keyframes doc-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.doc-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.doc-name {
+  font-size: 13.5px;
+  font-weight: 800;
+  color: var(--navy);
+  line-height: 1.3;
+}
+
+.doc-badge {
+  flex-shrink: 0;
+  font-size: 9.5px;
+  font-weight: 800;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  padding: 3px 9px;
+  border-radius: 999px;
+}
+
+.doc-badge.is-required {
+  color: var(--danger);
+  background: var(--danger-bg);
+  border: 1px solid var(--danger-border);
+}
+
+.doc-badge.is-optional {
+  color: var(--text-muted);
+  background: var(--surface-tint-strong);
+  border: 1px solid var(--border);
+}
+
+.doc-reason {
+  margin: 8px 0 12px;
+  font-size: 11.5px;
+  font-weight: 500;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+
+/* ---------- Drop zone ---------- */
+
+.doc-drop {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  margin-top: auto;
+  padding: 18px 12px;
+  border: 1.6px dashed var(--border-strong);
+  border-radius: 11px;
+  background: var(--surface-tint);
+  color: var(--text-muted);
+  cursor: pointer;
+  text-align: center;
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+
+.doc-drop:hover {
+  border-color: var(--blue-accent);
+  color: var(--blue-accent);
+  background: rgba(39, 83, 179, 0.05);
+}
+
+.doc-drop.is-over {
+  border-color: var(--blue-accent);
+  border-style: solid;
+  color: var(--blue-accent);
+  background: rgba(39, 83, 179, 0.1);
+}
+
+.doc-drop.has-files {
+  padding: 12px;
+}
+
+.doc-drop-text {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.doc-drop-text strong {
+  font-weight: 800;
+  color: var(--navy);
+}
+
+.doc-drop:hover .doc-drop-text strong,
+.doc-drop.is-over .doc-drop-text strong {
+  color: var(--blue-accent);
+}
+
+.doc-drop-sub {
+  font-size: 10px;
+  font-weight: 600;
+  opacity: 0.8;
+}
+
+.doc-input {
+  display: none;
+}
+
+/* ---------- Attached files ---------- */
+
+.doc-files {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.doc-file {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border: 1px solid rgba(0, 62, 45, 0.2);
+  border-radius: 8px;
+  background: rgba(0, 62, 45, 0.05);
+  font-size: 11.5px;
+}
+
+.doc-file > svg {
+  flex-shrink: 0;
+  color: var(--success);
+}
+
+.doc-file-name {
+  flex: 1;
+  min-width: 0;
+  font-weight: 700;
+  color: var(--navy);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.doc-file-size {
+  flex-shrink: 0;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.doc-file-remove {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-faint);
+  cursor: pointer;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.doc-file-remove:hover {
+  color: var(--danger);
+  background: var(--danger-bg);
+}
+
+/* ---------- Empty ---------- */
+
+.docs-empty {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 48px 32px;
+  border: 1.5px dashed var(--border-strong);
+  border-radius: 14px;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.6;
+}
+
+/* ---------- Responsive ---------- */
+
+@media (max-width: 760px) {
+  .docs {
+    padding: 18px 16px 22px;
+  }
+
+  .docs-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

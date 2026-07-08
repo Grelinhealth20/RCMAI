@@ -1,0 +1,438 @@
+.pae {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  padding: 16px 20px 18px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  background: var(--white);
+}
+
+/* ---------- Pipeline shell (compact, sleek) ---------- */
+
+.pae-pipeline {
+  position: relative;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 12px 18px 14px;
+  border: 1px solid var(--border-strong);
+  border-radius: 14px;
+  background: linear-gradient(180deg, var(--surface-tint) 0%, var(--white) 100%);
+  box-shadow: 0 1px 2px rgba(9, 17, 33, 0.04), 0 8px 22px rgba(9, 17, 33, 0.05);
+  overflow: hidden;
+}
+
+.pae-pipeline::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 2px;
+  background: linear-gradient(90deg, var(--navy) 0%, var(--blue-accent) 45%, var(--teal-accent-bright) 100%);
+  opacity: 0.9;
+}
+
+/* Vertical meta rail on the left of the compact bar */
+.pae-pipeline-head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex-shrink: 0;
+  padding-right: 20px;
+  border-right: 1px solid var(--border);
+}
+
+.pae-pipeline-title {
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.7px;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  white-space: nowrap;
+}
+
+.pae-pipeline-progress {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.pae-pipeline-progress strong {
+  color: var(--navy);
+  font-weight: 800;
+}
+
+/* ---------- Auto-run indicator ---------- */
+
+.pae-autorun {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.2px;
+  color: var(--blue-accent);
+  background: rgba(39, 83, 179, 0.1);
+  border: 1px solid rgba(39, 83, 179, 0.25);
+  padding: 5px 6px 5px 12px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.pae-autorun-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--blue-accent);
+  box-shadow: 0 0 0 0 rgba(39, 83, 179, 0.5);
+  animation: pae-autorun-pulse 1.3s infinite;
+}
+
+@keyframes pae-autorun-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(39, 83, 179, 0.5);
+  }
+  70% {
+    box-shadow: 0 0 0 7px rgba(39, 83, 179, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(39, 83, 179, 0);
+  }
+}
+
+.pae-autorun-stop {
+  padding: 3px 11px;
+  border: none;
+  border-radius: 999px;
+  background: var(--navy);
+  color: var(--white);
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+
+.pae-autorun-stop:hover {
+  opacity: 0.88;
+}
+
+/* ---------- Horizontal track ---------- */
+
+.pae-track {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.pae-track-line {
+  position: absolute;
+  top: 19px;
+  left: 7%;
+  right: 7%;
+  height: 2.5px;
+  border-radius: 999px;
+  background: var(--border-strong);
+  overflow: hidden;
+}
+
+.pae-track-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--blue-accent), var(--teal-accent-bright));
+  box-shadow: 0 0 10px rgba(18, 135, 158, 0.5);
+  transition: width 0.45s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ---------- Node (compact) ---------- */
+
+.pae-node {
+  position: relative;
+  z-index: 1;
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  padding: 0 2px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  text-align: center;
+  transition: transform 0.15s ease;
+}
+
+.pae-node:hover {
+  transform: translateY(-1px);
+}
+
+.pae-node-dot {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
+  background: var(--white);
+  border: 1.5px solid var(--border-strong);
+  color: var(--text-muted);
+  transition: background 0.25s ease, border-color 0.25s ease, color 0.25s ease, box-shadow 0.25s ease, transform 0.2s ease;
+}
+
+.pae-node-dot svg {
+  width: 16px;
+  height: 16px;
+}
+
+.pae-node-index {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 3px;
+  border-radius: 999px;
+  background: var(--white);
+  border: 1.5px solid var(--border-strong);
+  color: var(--text-muted);
+  font-size: 9px;
+  font-weight: 800;
+  line-height: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.25s ease, border-color 0.25s ease, color 0.25s ease;
+}
+
+.pae-node-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  max-width: 132px;
+}
+
+.pae-node-label {
+  font-size: 11.5px;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--navy);
+  white-space: normal;
+  overflow-wrap: break-word;
+  transition: color 0.2s ease;
+}
+
+.pae-node-caption {
+  font-size: 9.5px;
+  font-weight: 600;
+  line-height: 1.15;
+  color: var(--text-faint);
+  white-space: normal;
+  overflow-wrap: break-word;
+}
+
+/* Hover (non-active) */
+.pae-node:hover .pae-node-dot {
+  border-color: var(--blue-accent);
+  color: var(--blue-accent);
+  box-shadow: 0 5px 14px rgba(39, 83, 179, 0.16);
+}
+
+/* Complete */
+.pae-node.is-complete .pae-node-dot {
+  background: linear-gradient(135deg, var(--teal-accent-bright), var(--blue-accent));
+  border-color: transparent;
+  color: var(--white);
+  box-shadow: 0 5px 12px rgba(18, 135, 158, 0.3);
+}
+
+.pae-node.is-complete .pae-node-index {
+  background: var(--teal-accent-bright);
+  border-color: transparent;
+  color: var(--white);
+}
+
+/* Active */
+.pae-node.is-active .pae-node-dot {
+  background: linear-gradient(135deg, var(--blue-accent-2), var(--navy));
+  border-color: transparent;
+  color: var(--white);
+  transform: scale(1.08);
+  box-shadow: 0 7px 18px rgba(39, 83, 179, 0.4);
+  animation: pae-glow 2.4s ease-in-out infinite;
+}
+
+.pae-node.is-active .pae-node-index {
+  background: var(--warning);
+  border-color: transparent;
+  color: var(--navy);
+}
+
+.pae-node.is-active .pae-node-label {
+  color: var(--blue-accent);
+  font-weight: 800;
+}
+
+@keyframes pae-glow {
+  0%,
+  100% {
+    box-shadow: 0 7px 18px rgba(39, 83, 179, 0.4);
+  }
+  50% {
+    box-shadow: 0 7px 24px rgba(39, 83, 179, 0.64);
+  }
+}
+
+/* ---------- Per-step stage (fills the full remaining page) ---------- */
+
+.pae-stage {
+  flex: 1 1 auto;
+  /* Base fill is ~calc(100svh - 281px) (viewport minus app header, top nav,
+     padding, gap and the compact pipeline). Prior 1.495x, now +15% more
+     (1.495 x 1.15 = 1.71925x) makes the Main Panel taller; .pae is the single
+     scroll region that reveals it. */
+  min-height: calc(171.925svh - 483px);
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border-strong);
+  border-radius: 16px;
+  background: var(--white);
+  box-shadow: 0 1px 2px rgba(9, 17, 33, 0.04), 0 10px 30px rgba(9, 17, 33, 0.05);
+  overflow: hidden;
+}
+
+.pae-stage-head {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  flex-shrink: 0;
+  padding: 9px 18px;
+  border-bottom: 1px solid var(--border);
+  background: linear-gradient(180deg, var(--surface-tint) 0%, var(--white) 100%);
+}
+
+.pae-stage-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  border-radius: 9px;
+  color: var(--white);
+  background: linear-gradient(135deg, var(--blue-accent-2), var(--navy));
+  box-shadow: 0 4px 11px rgba(39, 83, 179, 0.28);
+}
+
+.pae-stage-badge svg {
+  width: 15px;
+  height: 15px;
+}
+
+.pae-stage-heading {
+  flex: 1;
+  min-width: 0;
+  line-height: 1.2;
+}
+
+.pae-stage-heading h2 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: -0.15px;
+  color: var(--navy);
+}
+
+.pae-stage-heading p {
+  margin: 1px 0 0;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.pae-stage-step {
+  flex-shrink: 0;
+  font-size: 9.5px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--blue-accent);
+  background: rgba(39, 83, 179, 0.1);
+  border: 1px solid rgba(39, 83, 179, 0.22);
+  padding: 4px 9px;
+  border-radius: 999px;
+}
+
+/* Blank per-step canvas. It simply fills the (tall) Main Panel; it does NOT get
+   its own oversized min-height — that previously made the body taller than the
+   panel and produced a second, nested scrollbar. The engine area (.pae) is the
+   single scroll region. */
+.pae-stage-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--white);
+}
+
+/* ---------- Responsive ---------- */
+
+@media (max-width: 900px) {
+  .pae {
+    padding: 14px 14px 16px;
+  }
+
+  .pae-pipeline {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  .pae-pipeline-head {
+    flex-direction: row;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    padding-right: 0;
+    padding-bottom: 10px;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .pae-track {
+    overflow-x: auto;
+    gap: 14px;
+    padding-bottom: 4px;
+  }
+
+  .pae-node {
+    flex: 0 0 116px;
+  }
+
+  .pae-track-line {
+    display: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .pae-node {
+    flex: 0 0 100px;
+  }
+
+  .pae-node-caption {
+    display: none;
+  }
+}

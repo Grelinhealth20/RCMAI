@@ -1,0 +1,70 @@
+:root {
+  /* Brand palette (official brand kit) */
+  --navy: #091121; /* Dark_blue */
+  --navy-2: #14264a; /* Dark_blue → Blue blend, for gradient depth */
+  --blue-accent: #2753b3; /* Blue */
+  --blue-accent-2: #3f6ad8; /* Blue, brightened for gradient tops */
+
+  /* AI-tech accent family */
+  --teal-accent: #003d51; /* Teal */
+  --teal-accent-bright: #12879e; /* Teal, brightened for gradients/live accents */
+  --violet-accent: #003d51; /* Prior Auth tag now uses brand Teal, not violet */
+  --slate-accent: #475569;
+
+  /* Warning (brand Yellow) */
+  --warning: #ff9e00; /* Yellow */
+
+  /* Surfaces */
+  --white: #ffffff;
+  --surface-tint: #f5f7fb;
+  --surface-tint-strong: #eef2fd;
+
+  /* Borders */
+  --border: #d7dde8;
+  --border-strong: #c1c9da;
+
+  /* Text */
+  --text-black: #0c0c0c;
+  --text-secondary: #4c566f;
+  --text-muted: #6b7590;
+  --text-faint: #8892a8;
+  --text-placeholder: #9099ab;
+
+  /* Semantic status */
+  --success: #003e2d; /* Green */
+  --success-live: #1e8a63; /* Green, brightened for the live pulse dot */
+  --danger: #c0293c; /* Not in the brand kit — kept for true error/validation states only */
+  --danger-bg: #fdecee;
+  --danger-border: #f2b9c1;
+
+  color-scheme: light;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  width: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--white);
+  color: var(--text-black);
+  font-family: "Segoe UI", "Inter", system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+button,
+input {
+  font-family: inherit;
+}
+
+::selection {
+  background: var(--blue-accent-2);
+  color: var(--white);
+}

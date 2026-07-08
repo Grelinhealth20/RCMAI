@@ -1,0 +1,955 @@
+/* Coding Engine — real-time processing pipeline + two equal panels
+   (Medical Records | Predicted ICD/CPT/Modifier codes).
+   Scoped under .ce; reuses the app's design tokens from index.css. */
+
+.ce {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  min-height: 100%;
+  padding: 14px 20px 20px;
+  background: var(--white);
+}
+
+/* ============================================================================
+ * Pipeline
+ * ==========================================================================*/
+
+.ce-pipeline {
+  position: relative;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 7px 16px 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: 13px;
+  background: linear-gradient(180deg, var(--surface-tint) 0%, var(--white) 100%);
+  box-shadow: 0 1px 2px rgba(9, 17, 33, 0.04), 0 8px 22px rgba(9, 17, 33, 0.05);
+  overflow: hidden;
+}
+
+/* Sleek gradient accent across the top edge. */
+.ce-pipeline::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 2px;
+  background: linear-gradient(90deg, var(--navy) 0%, var(--blue-accent) 45%, var(--teal-accent-bright) 100%);
+  opacity: 0.9;
+}
+
+.ce-pipeline-head {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  flex-shrink: 0;
+  padding-right: 18px;
+  border-right: 1px solid var(--border);
+}
+
+.ce-pipeline-title {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: var(--navy);
+  white-space: nowrap;
+}
+
+.ce-pipeline-sub {
+  font-size: 12.5px;
+  font-weight: 800;
+  color: var(--navy);
+  white-space: nowrap;
+}
+
+.ce-autorun {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11.5px;
+  font-weight: 800;
+  color: var(--blue-accent);
+  background: rgba(39, 83, 179, 0.1);
+  border: 1px solid rgba(39, 83, 179, 0.25);
+  padding: 3px 11px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.ce-autorun-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--blue-accent);
+  animation: ce-pulse 1.3s infinite;
+}
+
+@keyframes ce-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(39, 83, 179, 0.5);
+  }
+  70% {
+    box-shadow: 0 0 0 7px rgba(39, 83, 179, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(39, 83, 179, 0);
+  }
+}
+
+.ce-track {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.ce-track-line {
+  position: absolute;
+  top: 15px;
+  left: 10%;
+  right: 10%;
+  height: 2px;
+  border-radius: 999px;
+  background: var(--border-strong);
+  overflow: hidden;
+}
+
+.ce-track-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--blue-accent), var(--teal-accent-bright));
+  box-shadow: 0 0 10px rgba(18, 135, 158, 0.5);
+  transition: width 0.45s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.ce-node {
+  position: relative;
+  z-index: 1;
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 0 2px;
+  text-align: center;
+}
+
+.ce-node-dot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  background: var(--white);
+  border: 1.5px solid var(--border-strong);
+  color: var(--text-muted);
+  transition: background 0.25s ease, border-color 0.25s ease, color 0.25s ease, box-shadow 0.25s ease, transform 0.2s ease;
+}
+
+.ce-node-dot svg {
+  width: 15px;
+  height: 15px;
+}
+
+.ce-node-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  max-width: 148px;
+}
+
+.ce-node-label {
+  font-size: 10.5px;
+  font-weight: 800;
+  line-height: 1.2;
+  color: var(--navy);
+  overflow-wrap: break-word;
+}
+
+.ce-node-caption {
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1.15;
+  color: var(--text-muted);
+  overflow-wrap: break-word;
+}
+
+.ce-node.is-complete .ce-node-dot {
+  background: linear-gradient(135deg, var(--teal-accent-bright), var(--blue-accent));
+  border-color: transparent;
+  color: var(--white);
+  box-shadow: 0 4px 12px rgba(18, 135, 158, 0.3);
+}
+
+.ce-node.is-complete .ce-node-caption {
+  color: var(--teal-accent-bright);
+  font-weight: 800;
+}
+
+.ce-node.is-active .ce-node-dot {
+  background: linear-gradient(135deg, var(--blue-accent-2), var(--navy));
+  border-color: transparent;
+  color: var(--white);
+  transform: scale(1.1);
+  animation: ce-glow 2s ease-in-out infinite;
+}
+
+.ce-node.is-active .ce-node-label {
+  color: var(--blue-accent);
+  font-weight: 800;
+}
+
+@keyframes ce-glow {
+  0%,
+  100% {
+    box-shadow: 0 7px 18px rgba(39, 83, 179, 0.4);
+  }
+  50% {
+    box-shadow: 0 7px 24px rgba(39, 83, 179, 0.64);
+  }
+}
+
+/* ============================================================================
+ * Record identifiers (Claim ID · Patient Name · DOS · Next Record)
+ * ==========================================================================*/
+
+.ce-recordbar {
+  flex-shrink: 0;
+  display: grid;
+  /* Claim ID & DOS are compact; Patient Name takes the remaining width. */
+  grid-template-columns: 150px minmax(0, 1fr) 150px auto;
+  align-items: end;
+  gap: 14px;
+  padding: 10px 14px;
+  border: 1px solid var(--border-strong);
+  border-radius: 12px;
+  background: var(--white);
+  box-shadow: 0 1px 2px rgba(9, 17, 33, 0.04), 0 6px 16px rgba(9, 17, 33, 0.05);
+}
+
+.ce-rb-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+
+.ce-rb-label {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  text-align: center;
+  color: var(--navy);
+}
+
+.ce-rb-input {
+  width: 100%;
+  padding: 8px 11px;
+  border: 1.5px solid var(--border-strong);
+  border-radius: 9px;
+  background: var(--surface-tint);
+  color: var(--navy);
+  font-size: 13px;
+  font-weight: 700;
+  text-align: center;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+
+.ce-rb-input::placeholder {
+  color: var(--text-placeholder);
+  font-weight: 600;
+}
+
+.ce-rb-input:focus {
+  border-color: var(--blue-accent);
+  background: var(--white);
+  box-shadow: 0 0 0 3px rgba(39, 83, 179, 0.14);
+}
+
+.ce-rb-end {
+  align-self: end;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ce-queue-pill {
+  display: inline-flex;
+  align-items: center;
+  height: 26px;
+  padding: 0 11px;
+  border-radius: 999px;
+  background: rgba(39, 83, 179, 0.12);
+  color: var(--blue-accent);
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.ce-next-btn {
+  align-self: end;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 36px;
+  padding: 0 16px;
+  border: none;
+  border-radius: 9px;
+  background: linear-gradient(135deg, var(--blue-accent-2), var(--navy));
+  color: var(--white);
+  font-size: 12.5px;
+  font-weight: 800;
+  letter-spacing: 0.2px;
+  cursor: pointer;
+  white-space: nowrap;
+  box-shadow: 0 5px 14px rgba(39, 83, 179, 0.3);
+  transition: opacity 0.15s ease, transform 0.05s ease, box-shadow 0.2s ease;
+}
+
+.ce-next-btn:hover {
+  opacity: 0.94;
+  box-shadow: 0 7px 18px rgba(39, 83, 179, 0.4);
+}
+
+.ce-next-btn:active {
+  transform: translateY(1px);
+}
+
+/* ============================================================================
+ * Two equal panels — expanded ~20% taller; the engine area scrolls.
+ * ==========================================================================*/
+
+.ce-panels {
+  /* Fixed (definite) height so the panels never grow with the loaded record —
+   * the record/codes areas inside scroll instead. 1.38 = the previous 1.2 sizing
+   * expanded vertically by 15%. */
+  flex: none;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  height: calc((100svh - 300px) * 1.38);
+}
+
+.ce-panel {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  padding: 16px 18px 18px;
+  border: 2px solid var(--border-strong);
+  border-radius: 16px;
+  background: var(--white);
+  box-shadow: 0 1px 2px rgba(9, 17, 33, 0.04), 0 10px 28px rgba(9, 17, 33, 0.07);
+}
+
+.ce-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+}
+
+.ce-panel-legend {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 5px 13px;
+  font-size: 12.5px;
+  font-weight: 800;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--navy);
+  background: var(--surface-tint);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+}
+
+.ce-legend-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--blue-accent-2), var(--teal-accent-bright));
+}
+
+.ce-panel-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ce-specialty {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.ce-specialty-label {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.ce-specialty-select {
+  padding: 7px 30px 7px 11px;
+  border: 1.5px solid var(--border-strong);
+  border-radius: 9px;
+  background: var(--surface-tint);
+  color: var(--navy);
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  outline: none;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%234c566f' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 11px center;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.ce-specialty-select:focus {
+  border-color: var(--blue-accent);
+  box-shadow: 0 0 0 3px rgba(39, 83, 179, 0.14);
+}
+
+.ce-toolbtn {
+  padding: 7px 13px;
+  border: 1.5px solid var(--border-strong);
+  border-radius: 9px;
+  background: var(--white);
+  color: var(--navy);
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.ce-toolbtn:hover {
+  border-color: var(--blue-accent);
+  background: var(--surface-tint);
+}
+
+/* ---------- Left: record editor ---------- */
+
+.ce-proc-bar {
+  position: relative;
+  height: 3px;
+  width: 100%;
+  margin-top: 12px;
+  border-radius: 999px;
+  background: var(--surface-tint-strong);
+  overflow: hidden;
+}
+
+.ce-proc-bar::after {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 38%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, transparent, var(--blue-accent), var(--teal-accent-bright), transparent);
+  animation: ce-slide 1.15s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+@keyframes ce-slide {
+  0% {
+    transform: translateX(-110%);
+  }
+  100% {
+    transform: translateX(360%);
+  }
+}
+
+.ce-record-input,
+.ce-record-view {
+  /* flex:1 + min-height:0 makes this the ONLY scrollable element — it fills the
+   * fixed-height panel and scrolls internally, so a large record never expands
+   * the Medical Records panel. */
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  margin-top: 12px;
+  padding: 16px 18px;
+  border: 2px solid var(--border-strong);
+  border-radius: 12px;
+  background: var(--surface-tint);
+  color: var(--text-black);
+  font-family: 'Segoe UI', 'Inter', system-ui, sans-serif;
+  font-size: 14.5px;
+  font-weight: 600;
+  line-height: 1.6;
+  letter-spacing: 0.1px;
+  outline: none;
+  overflow-y: auto;
+}
+
+.ce-record-input {
+  resize: none;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+}
+
+.ce-record-input::placeholder {
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.ce-record-input:focus {
+  border-color: var(--blue-accent);
+  background: var(--white);
+  box-shadow: 0 0 0 4px rgba(39, 83, 179, 0.16);
+}
+
+.ce-record-view {
+  background: var(--white);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.ce-mark {
+  border-radius: 4px;
+  padding: 1px 2px;
+  font-weight: 800;
+  color: var(--navy);
+}
+
+.ce-mark-icd {
+  background: rgba(39, 83, 179, 0.18);
+  box-shadow: inset 0 -2px 0 rgba(39, 83, 179, 0.55);
+}
+
+.ce-mark-cpt {
+  background: rgba(18, 135, 158, 0.18);
+  box-shadow: inset 0 -2px 0 rgba(18, 135, 158, 0.6);
+}
+
+.ce-mark.is-active {
+  box-shadow: 0 0 0 2px currentColor;
+}
+
+.ce-record-foot {
+  flex-shrink: 0;
+  margin-top: 10px;
+  font-size: 11.5px;
+  font-weight: 700;
+}
+
+.ce-foot-hint {
+  color: var(--text-faint);
+}
+.ce-foot-err {
+  color: var(--danger);
+}
+.ce-foot-val.ce-foot-pass {
+  color: var(--success-live);
+}
+.ce-foot-val.ce-foot-warn {
+  color: #8a5a00;
+}
+.ce-foot-val.ce-foot-fail {
+  color: var(--danger);
+}
+
+/* ---------- Right: predicted codes ---------- */
+
+.ce-codes-scroll {
+  flex: 1;
+  min-height: 0;
+  margin-top: 12px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.ce-codes-section + .ce-codes-section {
+  margin-top: 18px;
+}
+
+.ce-codes-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.ce-codes-title {
+  font-size: 11.5px;
+  font-weight: 800;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  color: var(--navy);
+}
+
+.ce-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 11px;
+  border: 1.5px solid var(--blue-accent);
+  border-radius: 8px;
+  background: rgba(39, 83, 179, 0.08);
+  color: var(--blue-accent);
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, transform 0.1s ease;
+}
+
+.ce-add:hover {
+  background: var(--blue-accent);
+  color: var(--white);
+}
+
+.ce-add:active {
+  transform: scale(0.96);
+}
+
+/* 4 boxes in a row. */
+.ce-box-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.ce-box {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  animation: ce-expand 0.25s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes ce-expand {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scaleY(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scaleY(1);
+  }
+}
+
+.ce-box-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.ce-box-input {
+  width: 100%;
+  padding: 9px 42px 9px 12px;
+  border: 1.5px solid var(--border-strong);
+  border-radius: 8px;
+  background: var(--surface-tint);
+  color: var(--navy);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+
+.ce-box-input::placeholder {
+  color: var(--text-placeholder);
+  font-weight: 600;
+}
+
+.ce-box-input:focus {
+  border-color: var(--blue-accent);
+  background: var(--white);
+  box-shadow: 0 0 0 3px rgba(39, 83, 179, 0.14);
+}
+
+.ce-box.is-verified .ce-box-input {
+  border-color: var(--teal-accent-bright);
+}
+
+.ce-box-flag {
+  position: absolute;
+  right: 25px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  font-size: 10px;
+  font-weight: 900;
+  line-height: 1;
+  cursor: help;
+}
+
+.ce-box.sev-ok .ce-box-input {
+  border-color: var(--success-live);
+}
+.ce-box.sev-ok .ce-box-flag {
+  color: var(--white);
+  background: var(--success-live);
+}
+.ce-box.sev-warning .ce-box-input {
+  border-color: var(--warning);
+  background: rgba(255, 158, 0, 0.08);
+}
+.ce-box.sev-warning .ce-box-flag {
+  color: var(--navy);
+  background: var(--warning);
+}
+.ce-box.sev-error .ce-box-input {
+  border-color: var(--danger);
+  background: var(--danger-bg);
+}
+.ce-box.sev-error .ce-box-flag {
+  color: var(--white);
+  background: var(--danger);
+}
+
+.ce-box-remove {
+  position: absolute;
+  right: 5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-faint);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+
+.ce-box:hover .ce-box-remove {
+  opacity: 1;
+}
+
+.ce-box-remove:hover {
+  color: var(--danger);
+  background: var(--danger-bg);
+}
+
+.ce-box-sub {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ce-box-units {
+  width: 58px;
+  padding: 5px 8px;
+  border: 1.5px solid var(--border);
+  border-radius: 7px;
+  background: var(--white);
+  color: var(--navy);
+  font-size: 11px;
+  font-weight: 700;
+  outline: none;
+}
+
+.ce-box-units:focus {
+  border-color: var(--blue-accent);
+}
+
+.ce-box-mods {
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--teal-accent-bright);
+  letter-spacing: 0.3px;
+}
+
+.ce-box-desc {
+  font-size: 9.5px;
+  font-weight: 600;
+  line-height: 1.25;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+/* ---------- CDI + CMS audit intelligence ---------- */
+
+.ce-intel {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px dashed var(--border-strong);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.ce-intel-title {
+  display: block;
+  margin-bottom: 9px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--navy);
+}
+
+.ce-intel-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ce-intel-item {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 10px 12px;
+  border-radius: 9px;
+  border: 1px solid var(--border);
+  background: var(--surface-tint);
+  font-size: 11.5px;
+  line-height: 1.4;
+}
+
+.ce-intel-item strong {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--navy);
+}
+
+.ce-intel-item span {
+  color: var(--text-secondary);
+}
+
+.ce-intel-item em {
+  font-style: normal;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--blue-accent);
+}
+
+.ce-intel-cdi {
+  border-color: rgba(39, 83, 179, 0.28);
+  background: rgba(39, 83, 179, 0.06);
+}
+
+.ce-audit-critical {
+  border-color: var(--danger-border);
+  background: var(--danger-bg);
+}
+.ce-audit-warning {
+  border-color: rgba(255, 158, 0, 0.4);
+  background: rgba(255, 158, 0, 0.1);
+}
+.ce-audit-info {
+  border-color: rgba(18, 135, 158, 0.3);
+  background: rgba(18, 135, 158, 0.07);
+}
+
+.ce-audit-src {
+  flex-shrink: 0;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 2px 7px;
+}
+
+/* ============================================================================
+ * Responsive
+ * ==========================================================================*/
+
+@media (max-width: 1000px) {
+  .ce-panels {
+    grid-template-columns: minmax(0, 1fr);
+    /* Stacked panels size to content on narrow screens. */
+    height: auto;
+  }
+
+  .ce-record-input,
+  .ce-record-view,
+  .ce-codes-scroll {
+    min-height: 340px;
+  }
+
+  .ce-box-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  .ce-pipeline {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  .ce-pipeline-head {
+    flex-direction: row;
+    align-items: baseline;
+    justify-content: space-between;
+    padding-right: 0;
+    padding-bottom: 10px;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .ce-track {
+    overflow-x: auto;
+    gap: 14px;
+  }
+
+  .ce-node {
+    flex: 0 0 128px;
+  }
+
+  .ce-track-line {
+    display: none;
+  }
+
+  .ce-recordbar {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .ce-rb-end {
+    grid-column: 1 / -1;
+    justify-content: center;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ce-proc-bar::after,
+  .ce-node.is-active .ce-node-dot,
+  .ce-autorun-dot {
+    animation: none;
+  }
+}
