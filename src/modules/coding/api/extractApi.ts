@@ -53,7 +53,17 @@ export async function extractDosRecords(
     signal,
   })
 
-  const data = (await res.json()) as RawResponse
+  const raw = await res.text()
+  let data: RawResponse
+  try {
+    data = raw ? (JSON.parse(raw) as RawResponse) : {}
+  } catch {
+    throw new Error(
+      res.ok
+        ? 'The extraction service returned an unexpected response. Please retry.'
+        : `Extraction service unavailable (HTTP ${res.status}). It may be starting up — please retry.`,
+    )
+  }
   if (!res.ok) {
     throw new Error(str(data.error) || `Extraction failed (${res.status})`)
   }

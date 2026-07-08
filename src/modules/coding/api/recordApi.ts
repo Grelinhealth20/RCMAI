@@ -59,7 +59,17 @@ export async function generateRecord(
     signal,
   })
 
-  const data = (await res.json()) as RawResponse
+  const raw = await res.text()
+  let data: RawResponse
+  try {
+    data = raw ? (JSON.parse(raw) as RawResponse) : {}
+  } catch {
+    throw new Error(
+      res.ok
+        ? 'The record generator returned an unexpected response. Please retry.'
+        : `Record service unavailable (HTTP ${res.status}). It may be starting up — please retry.`,
+    )
+  }
   if (!res.ok) {
     throw new Error(str(data.error) || `Record generation failed (${res.status})`)
   }

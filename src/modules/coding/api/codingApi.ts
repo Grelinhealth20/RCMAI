@@ -163,7 +163,21 @@ export async function predictCoding(
     signal,
   })
 
-  const data = (await res.json()) as RawResponse
+  // The prediction endpoint must return JSON. If the dev server is (re)starting
+  // it can momentarily return an HTML error page — parse defensively so the
+  // engine surfaces a clear, recoverable message instead of a raw
+  // "Unexpected token" JSON crash.
+  const raw = await res.text()
+  let data: RawResponse
+  try {
+    data = raw ? (JSON.parse(raw) as RawResponse) : {}
+  } catch {
+    throw new Error(
+      res.ok
+        ? 'The coding engine returned an unexpected response. Please retry in a moment.'
+        : `Coding service unavailable (HTTP ${res.status}). It may be starting up — please retry.`,
+    )
+  }
   if (!res.ok) {
     throw new Error(asText(data.error) || `Coding prediction failed (${res.status})`)
   }
