@@ -10,6 +10,8 @@ import './ChartWorklist.css'
 
 const FILTER_EXAMPLES = ['pending charts', 'coded claims for Aetna', 'submitted charts', 'charts still to code']
 
+const PAGE_SIZE = 10
+
 interface ChartWorklistProps {
   rows: ChartRow[]
   filesReceived: number
@@ -148,6 +150,7 @@ function ChartWorklist({ rows, filesReceived, onAddRows, onSendToCoding, onSendF
   const [busy, setBusy] = useState(false)
   const [modalOpen, setModalOpen] = useState(false)
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
+  const [page, setPage] = useState(1)
   // The chart whose complete record is open in the View modal, if any.
   const [viewRow, setViewRow] = useState<ChartRow | null>(null)
   const inputRef = useRef<HTMLInputElement | null>(null)
@@ -224,6 +227,9 @@ function ChartWorklist({ rows, filesReceived, onAddRows, onSendToCoding, onSendF
             continue
           }
           onAddRows(newRows, 1)
+          // Jump to the first page so the just-extracted charts (now at the top)
+          // are immediately visible.
+          setPage(1)
           appendLog(uid, {
             text: `Patient identified — ${result.patient.name || 'Unknown'} · ${result.patient.payer || 'payer not documented'}`,
             kind: 'ok',
@@ -283,6 +289,7 @@ function ChartWorklist({ rows, filesReceived, onAddRows, onSendToCoding, onSendF
       .then((f) => {
         setFilter(f)
         setAppliedLabel(q)
+        setPage(1)
       })
       .catch((err: unknown) => {
         if (err instanceof DOMException && err.name === 'AbortError') return
@@ -296,9 +303,14 @@ function ChartWorklist({ rows, filesReceived, onAddRows, onSendToCoding, onSendF
     setFilter(null)
     setAppliedLabel('')
     setFilterErr('')
+    setPage(1)
   }
 
   const filteredRows = useMemo(() => applyWorklistFilter(rows, filter), [rows, filter])
+
+  const totalPages = Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE))
+  const clampedPage = Math.min(page, totalPages)
+  const pageRows = filteredRows.slice((clampedPage - 1) * PAGE_SIZE, clampedPage * PAGE_SIZE)
 
   const stats = useMemo(() => {
     const pending = filteredRows.filter((r) => r.status === 'Pending' || r.status === 'Coding').length
@@ -484,7 +496,7 @@ function ChartWorklist({ rows, filesReceived, onAddRows, onSendToCoding, onSendF
                 </td>
               </tr>
             ) : (
-              filteredRows.map((r) => (
+              pageRows.map((r) => (
                 <tr key={r.id} className={r.id === activeCodingRowId ? 'is-active' : ''}>
                   <td className="cw-mono">{r.patientId}</td>
                   <td className="cw-mono">{r.claimId}</td>
@@ -526,6 +538,20 @@ function ChartWorklist({ rows, filesReceived, onAddRows, onSendToCoding, onSendF
           </tbody>
         </table>
       </div>
+
+      {filteredRows.length > PAGE_SIZE && (
+        <div className="cw-pagination">
+          <button type="button" className="cw-page-btn" disabled={clampedPage <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
+            ← Prev
+          </button>
+          <span className="cw-page-info">
+            Page <strong>{clampedPage}</strong> of <strong>{totalPages}</strong>
+          </span>
+          <button type="button" className="cw-page-btn" disabled={clampedPage >= totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))}>
+            Next →
+          </button>
+        </div>
+      )}
 
       {/* ---------- Real-time extraction popup ---------- */}
       {modalOpen && (

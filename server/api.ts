@@ -1845,6 +1845,143 @@ Return ONLY JSON of the exact shape: { "note": "<the full note text, with real n
 }
 
 /* ============================================================================
+ * Route: appeal-letter — gpt-4.1 payer-specific denial appeal letter drafter.
+ * ==========================================================================*/
+async function handleAppealLetter(body: Record<string, unknown>, apiKey: string): Promise<RouteResult> {
+  try {
+    if (!apiKey) {
+      return { status: 500, json: { error: 'OPENAI_API_KEY is not configured on the server.' } }
+    }
+
+    const payerName = typeof body.payerName === 'string' ? body.payerName.trim() : ''
+    if (!payerName) {
+      return { status: 400, json: { error: 'A payer is required to draft the appeal letter.' } }
+    }
+    const denialReason = typeof body.denialReason === 'string' ? body.denialReason.trim() : ''
+    const denialCarc = typeof body.denialCarc === 'string' ? body.denialCarc.trim() : ''
+    if (!denialReason && !denialCarc) {
+      return { status: 400, json: { error: 'A denial reason (CARC or description) is required to draft the appeal.' } }
+    }
+
+    const cacheKey = cacheKeyFor('appeal-letter', body)
+    const cached = serveFromCache(cacheKey)
+    if (cached) return cached
+
+    const systemPrompt = `You are a senior medical-billing appeals specialist. Draft a COMPLETE, enterprise-grade, PAYER-SPECIFIC insurance claim denial APPEAL LETTER that is ready to send directly to the named payer's Appeals / Grievances department. This is a formal business letter — not a generic template.
+
+Return ONLY strict JSON of this EXACT shape:
+{ "subject": "<one-line RE/subject for the letter>", "letter": "<the full formatted appeal letter as plain text with real newlines>" }
+
+The "letter" MUST be a professional, submission-ready letter containing, in order:
+1. Date line (use the provided submissionDate) and the payer's Appeals Department address block (use payerAppealsAddress / payer name; if no street address is provided, address it to "<Payer> — Provider Appeals / Grievances Department").
+2. A "RE:" block: Patient name, Member/Subscriber ID, Claim Number, Date(s) of Service, Billed Amount, and the appeal level (e.g., "First-Level Provider Appeal").
+3. A formal salutation.
+4. Opening paragraph clearly stating this is a formal appeal of the denial of the identified claim and requesting the denial be overturned and the claim reprocessed for payment.
+5. A "Basis for Denial" paragraph accurately restating the payer's denial reason (cite the CARC code and description if provided).
+6. A detailed "Grounds for Appeal" section (2-4 paragraphs) that rebuts the denial with a PAYER-SPECIFIC, coding- and policy-based argument tailored to the denial type:
+   - authorization-absent denials → assert the service was rendered as medically necessary and reference that authorization was obtained / is not required / retro-authorization is warranted.
+   - medical-necessity denials → argue medical necessity using the clinical context and the payer's own medical-policy criteria by name.
+   - bundling/NCCI denials → argue the services were distinct/separately reportable and cite the appropriate modifier rationale.
+   - coding/diagnosis-mismatch denials → establish that the diagnosis supports the procedure and the claim was coded correctly.
+   Weave in the provided CPT/HCPCS procedure(s), ICD-10 diagnosis, and clinical context. Cite applicable standards (CMS/NCCI, the payer's medical policy, or plan documents) where relevant, without fabricating specific policy numbers.
+7. A "Supporting Documentation" paragraph listing the enclosed evidence (medical records, notes, authorization, letter of medical necessity, remittance/EOB) appropriate to the denial.
+8. A clear, explicit request: overturn the denial and reprocess claim <claim number> for payment of the billed/allowed amount, with a requested written response timeframe.
+9. Professional closing and a full signature block: provider name, credentials, NPI, facility/practice name, address, and phone.
+
+STRICT RULES:
+- Use ONLY the provided data. NEVER invent patient facts, dates, dollar amounts, identifiers, NPIs, or specific policy/reference numbers. If a needed field is missing, write it in natural professional prose using a clearly bracketed placeholder like "[Member ID]" so staff can fill it — do not fabricate a value.
+- Do not include any markdown, headings with '#', bullets, or tables — produce clean letter prose with paragraph breaks only.
+- Confident, precise, respectful professional tone. Complete and ready to sign.`
+
+    const openaiRes = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+      body: JSON.stringify({
+        model: 'gpt-4.1',
+        temperature: 0.25,
+        max_tokens: 3000,
+        response_format: { type: 'json_object' },
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: JSON.stringify(body) },
+        ],
+      }),
+    })
+
+    if (!openaiRes.ok) {
+      return { status: 502, json: { error: `OpenAI API error: ${await openaiRes.text()}` } }
+    }
+
+    const data = (await openaiRes.json()) as { choices: { message: { content: string } }[] }
+    const parsed = JSON.parse(data.choices?.[0]?.message?.content ?? '{}') as Record<string, unknown>
+    const letter = typeof parsed.letter === 'string' ? parsed.letter.trim() : ''
+    const subject = typeof parsed.subject === 'string' ? parsed.subject.trim() : ''
+    if (!letter) {
+      return { status: 502, json: { error: 'The appeal drafter did not return a letter.' } }
+    }
+    return cacheAndSend(cacheKey, { letter, subject })
+  } catch (err) {
+    return { status: 500, json: { error: err instanceof Error ? err.message : 'Unknown server error' } }
+  }
+}
+
+/* ============================================================================
+ * Route: appeals-filter — gpt-4o-mini appeals worklist filter parser.
+ * ==========================================================================*/
+async function handleAppealsFilter(body: Record<string, unknown>, apiKey: string): Promise<RouteResult> {
+  try {
+    if (!apiKey) {
+      return { status: 500, json: { error: 'OPENAI_API_KEY is not configured on the server.' } }
+    }
+
+    const query = body.query
+    if (typeof query !== 'string' || !query.trim()) {
+      return { status: 400, json: { error: 'A natural language "query" string is required.' } }
+    }
+
+    const cacheKey = cacheKeyFor('appeals-filter', { query: query.trim().toLowerCase() })
+    const cached = serveFromCache(cacheKey)
+    if (cached) return cached
+
+    const systemPrompt = `You convert a natural-language request into a strict JSON filter for an insurance-denial APPEALS worklist.
+Return ONLY JSON of this EXACT shape:
+{
+  "status": one of "sent" | "in-process" | "yet-to-process" | "all",
+  "payerName": string or null,
+  "patientName": string or null,
+  "keywords": string[]
+}
+Map phrasing to status: "sent"/"submitted"/"filed"/"mailed"→sent; "in process"/"in progress"/"drafting"/"being worked"/"generated"→in-process; "yet to process"/"not started"/"pending"/"to do"/"unprocessed"/"new"→yet-to-process. Use "all" when no status is implied.
+Extract a payer/insurance name and a patient name if present. keywords = lowercase salient terms not already captured (denial codes like "co-197", reason words, procedure terms). Respond with ONLY the JSON object.`
+
+    const openaiRes = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        temperature: 0,
+        max_tokens: 300,
+        response_format: { type: 'json_object' },
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: query },
+        ],
+      }),
+    })
+
+    if (!openaiRes.ok) {
+      return { status: 502, json: { error: `OpenAI API error: ${await openaiRes.text()}` } }
+    }
+
+    const data = (await openaiRes.json()) as { choices: { message: { content: string } }[] }
+    const parsed = JSON.parse(data.choices?.[0]?.message?.content ?? '{}')
+    return cacheAndSend(cacheKey, parsed)
+  } catch (err) {
+    return { status: 500, json: { error: err instanceof Error ? err.message : 'Unknown server error' } }
+  }
+}
+
+/* ============================================================================
  * Dispatcher
  * ==========================================================================*/
 
@@ -1866,6 +2003,8 @@ const ROUTE_HANDLERS: Record<string, RouteHandler> = {
   'ar-smart-filter': handleArSmartFilter,
   'ar-intelligence': handleArIntelligence,
   'ar-note': handleArNote,
+  'appeal-letter': handleAppealLetter,
+  'appeals-filter': handleAppealsFilter,
 }
 
 /** Route names accepted (the path segment after "/api/"). */

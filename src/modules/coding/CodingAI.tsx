@@ -80,9 +80,10 @@ function CodingAI() {
   )
   const queuePosition = activeRow && queue.length > 0 ? { index: queueIndex, total: queue.length } : null
 
-  /** Append newly extracted DOS rows and count the documents received. */
+  /** Prepend newly extracted DOS rows so the latest extraction appears first in
+   *  the worklist, and count the documents received. */
   const addRows = (newRows: ChartRow[], filesCount: number) => {
-    setRows((rs) => [...rs, ...newRows])
+    setRows((rs) => [...newRows, ...rs])
     setFilesReceived((n) => n + filesCount)
   }
 
