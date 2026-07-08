@@ -1,4 +1,4 @@
-import { useMemo, useState, type CSSProperties } from 'react'
+import { Fragment, useMemo, useState, type CSSProperties } from 'react'
 import { INTAKE_QUEUE, type DecisionQueue, type IntakeClaim } from './engine/intakeEngine'
 import { fmtUSD } from './engine/money'
 import { routeClaim, PIPELINE_STAGES, QUEUE_LABEL, type IntelligenceDecision, type StageStatus } from './api/arIntelligenceApi'
@@ -12,7 +12,7 @@ interface ClaimUI {
   error?: string
 }
 
-/** Detailed sub-steps surfaced inside each trunk stage (provider-readable). */
+/** Detailed sub-steps surfaced inside each pipeline stage (provider-readable). */
 const STAGE_SUBSTEPS: Record<string, string[]> = {
   eligibility: ['Member active on date of service', 'Plan & benefit verification', 'Coordination of benefits (COB)'],
   'claim-status': ['Clearinghouse acceptance (277CA)', 'Payer receipt confirmation', 'Adjudication state & AR aging'],
@@ -117,8 +117,8 @@ function ARIntelligence() {
             </span>
           </span>
           <span className="ait-bar-sub">
-            A single, centralized decision tree — every claim is validated through the pipeline and its sub-steps, then routed to
-            the right queue for your team.
+            A single, centralized decision tree — every claim flows left to right through the validation pipeline and its
+            sub-steps, then branches to the correct decision queue for your team.
           </span>
         </div>
         <div className="ait-bar-actions">
@@ -137,48 +137,40 @@ function ARIntelligence() {
         </div>
       </div>
 
-      {/* ---------- The single family tree ---------- */}
+      {/* ---------- The single horizontal family tree ---------- */}
       <div className={`ait-tree${running ? ' is-running' : ''}`}>
-        <div className="ait-grid" aria-hidden="true" />
-
-        {/* Root */}
-        <div className="ait-node ait-root">
-          <span className="ait-ring" style={{ '--pct': `${pct}%` } as CSSProperties}>
-            <span className="ait-ring-inner">
-              <span className="ait-ring-num">{processed}</span>
-              <span className="ait-ring-den">/ {total}</span>
+        <div className="ait-flow">
+          {/* Root */}
+          <div className="ait-node ait-root">
+            <span className="ait-ring" style={{ '--pct': `${pct}%` } as CSSProperties}>
+              <span className="ait-ring-inner">
+                <span className="ait-ring-num">{processed}</span>
+                <span className="ait-ring-den">/ {total}</span>
+              </span>
             </span>
-          </span>
-          <div className="ait-root-text">
-            <span className="ait-root-title">AI Validation Engine</span>
-            <span className="ait-root-sub">{running ? 'Processing claim intake…' : processed === total && processed > 0 ? 'All claims routed' : 'Claim intake queue'}</span>
-            <span className="ait-root-meta">{total} pending claims · eligibility → status → remittance → rules</span>
+            <div className="ait-root-text">
+              <span className="ait-root-title">AI Validation Engine</span>
+              <span className="ait-root-sub">
+                {running ? 'Processing intake…' : processed === total && processed > 0 ? 'All claims routed' : 'Claim intake'}
+              </span>
+              <span className="ait-root-meta">{total} pending claims</span>
+            </div>
           </div>
-        </div>
 
-        <div className="ait-link" aria-hidden="true" />
+          <div className="ait-hlink" aria-hidden="true" />
 
-        {/* Trunk: validation stages with sub-steps */}
-        <div className="ait-trunk">
+          {/* Pipeline stages (horizontal spine) */}
           {PIPELINE_STAGES.map((stage, i) => {
             const t = stageTally[i]
-            const activeNow = running
             return (
-              <div key={stage.key}>
-                <div className={`ait-node ait-stage${activeNow ? ' is-active' : ''}${processed > 0 ? ' is-live' : ''}`}>
+              <Fragment key={stage.key}>
+                <div className={`ait-node ait-stage${running ? ' is-active' : ''}${processed > 0 ? ' is-live' : ''}`}>
                   <div className="ait-stage-head">
                     <span className="ait-stage-idx">{i + 1}</span>
                     <div className="ait-stage-titles">
                       <span className="ait-stage-name">{stage.label}</span>
                       <span className="ait-stage-cap">{stage.caption}</span>
                     </div>
-                    {processed > 0 && (
-                      <div className="ait-stage-tally" title={`${t.pass} pass · ${t.flag} flag · ${t.fail} fail`}>
-                        {t.pass > 0 && <span className="tly tly-pass">✓{t.pass}</span>}
-                        {t.flag > 0 && <span className="tly tly-flag">!{t.flag}</span>}
-                        {t.fail > 0 && <span className="tly tly-fail">✕{t.fail}</span>}
-                      </div>
-                    )}
                   </div>
                   <ul className="ait-substeps">
                     {STAGE_SUBSTEPS[stage.key].map((s) => (
@@ -188,65 +180,70 @@ function ARIntelligence() {
                       </li>
                     ))}
                   </ul>
-                </div>
-                <div className="ait-link" aria-hidden="true" />
-              </div>
-            )
-          })}
-        </div>
-
-        {/* Router */}
-        <div className="ait-node ait-router">
-          <span className="ait-router-icon" aria-hidden="true">
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="none">
-              <path d="M12 3v6M12 9L6 15v3M12 9l6 6v3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-              <circle cx="12" cy="3" r="1.6" fill="currentColor" />
-            </svg>
-          </span>
-          <div className="ait-router-text">
-            <span className="ait-router-title">AI Decision Router</span>
-            <span className="ait-router-sub">{processed} of {total} claims routed by rules + AI</span>
-          </div>
-        </div>
-
-        {/* Branch fan to the four queues */}
-        <svg className="ait-fan" viewBox="0 0 1000 56" preserveAspectRatio="none" aria-hidden="true">
-          {[125, 375, 625, 875].map((x, i) => (
-            <path key={i} className={`ait-fan-path${running ? ' is-flow' : ''}`} d={`M500 0 C500 42 ${x} 12 ${x} 56`} />
-          ))}
-        </svg>
-
-        {/* Queues (leaves) */}
-        <div className="ait-queues">
-          {QUEUE_ORDER.map((q) => {
-            const claims = byQueue[q]
-            return (
-              <div key={q} className={`ait-queue ${QUEUE_META[q].cls}`}>
-                <div className="ait-queue-head">
-                  <span className="ait-queue-label">{QUEUE_LABEL[q]}</span>
-                  <span className="ait-queue-count">{claims.length}</span>
-                </div>
-                <span className="ait-queue-blurb">{QUEUE_META[q].blurb}</span>
-                <div className="ait-queue-chips">
-                  {claims.length === 0 ? (
-                    <span className="ait-queue-empty">{running ? 'routing…' : 'awaiting'}</span>
-                  ) : (
-                    claims.map((c) => (
-                      <button
-                        key={c.id}
-                        type="button"
-                        className="ait-chip"
-                        onClick={() => setSelectedId(c.id)}
-                        title={`${c.patientName} · ${c.payerName} · ${fmtUSD(c.chargesCents)}`}
-                      >
-                        {chipLabel(c)}
-                      </button>
-                    ))
+                  {processed > 0 && (
+                    <div className="ait-stage-tally" title={`${t.pass} pass · ${t.flag} flag · ${t.fail} fail`}>
+                      {t.pass > 0 && <span className="tly tly-pass">✓ {t.pass}</span>}
+                      {t.flag > 0 && <span className="tly tly-flag">! {t.flag}</span>}
+                      {t.fail > 0 && <span className="tly tly-fail">✕ {t.fail}</span>}
+                    </div>
                   )}
                 </div>
-              </div>
+                <div className="ait-hlink" aria-hidden="true" />
+              </Fragment>
             )
           })}
+
+          {/* Router */}
+          <div className="ait-node ait-router">
+            <span className="ait-router-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none">
+                <path d="M4 12h6M10 12l4-6h6M10 12l4 6h6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                <circle cx="4" cy="12" r="1.6" fill="currentColor" />
+              </svg>
+            </span>
+            <div className="ait-router-text">
+              <span className="ait-router-title">AI Decision Router</span>
+              <span className="ait-router-sub">{processed}/{total} routed</span>
+            </div>
+          </div>
+
+          {/* Branch connector into the stacked queues */}
+          <div className="ait-branch" aria-hidden="true" />
+
+          {/* Queues (leaves) — stacked vertically on the right */}
+          <div className="ait-queues">
+            {QUEUE_ORDER.map((q) => {
+              const claims = byQueue[q]
+              return (
+                <div key={q} className={`ait-queue ${QUEUE_META[q].cls}`}>
+                  <div className="ait-queue-main">
+                    <div className="ait-queue-head">
+                      <span className="ait-queue-label">{QUEUE_LABEL[q]}</span>
+                      <span className="ait-queue-count">{claims.length}</span>
+                    </div>
+                    <span className="ait-queue-blurb">{QUEUE_META[q].blurb}</span>
+                  </div>
+                  <div className="ait-queue-chips">
+                    {claims.length === 0 ? (
+                      <span className="ait-queue-empty">{running ? 'routing…' : 'awaiting'}</span>
+                    ) : (
+                      claims.map((c) => (
+                        <button
+                          key={c.id}
+                          type="button"
+                          className="ait-chip"
+                          onClick={() => setSelectedId(c.id)}
+                          title={`${c.patientName} · ${c.payerName} · ${fmtUSD(c.chargesCents)}`}
+                        >
+                          {chipLabel(c)}
+                        </button>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
         </div>
       </div>
 

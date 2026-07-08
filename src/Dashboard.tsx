@@ -10,7 +10,8 @@ interface DashboardProps {
 function Dashboard({ onLogout }: DashboardProps) {
   const [isLoggingOut, setIsLoggingOut] = useState(false)
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
-  const [activeModuleId, setActiveModuleId] = useState<string | null>(null)
+  // Land on the Eligibility system immediately after login (not a blank dashboard).
+  const [activeModuleId, setActiveModuleId] = useState<string | null>('eligibility-ai')
 
   const handleLogout = () => {
     setIsLoggingOut(true)

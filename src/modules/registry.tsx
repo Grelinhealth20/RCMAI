@@ -2,7 +2,6 @@ import type { ComponentType } from 'react'
 import EligibilityAI from './EligibilityAI'
 import PriorAuthorizationAI from './PriorAuthorizationAI'
 import CodingAI from './CodingAI'
-import ClaimsSubmissionAI from './ClaimsSubmissionAI'
 import ARDenialManagement from './ARDenialManagement'
 import AppealsAI from './AppealsAI'
 import PerformanceAI from './PerformanceAI'
@@ -10,7 +9,6 @@ import {
   EligibilityIcon,
   PriorAuthIcon,
   CodingIcon,
-  ClaimsIcon,
   ARDenialIcon,
   AppealsIcon,
   PerformanceIcon,
