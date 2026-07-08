@@ -9,19 +9,33 @@ import {
   splitCptModifiers,
   type Specialty,
 } from './data/codingReference'
+import { evaluateChange, isCompleteCode, type ChangeKind } from './data/changeValidation'
+import CodeChangeReview, { type ReviewTarget } from './CodeChangeReview'
 import './CodingEngine.css'
 
 /* ============================================================================
  * Editable code models
  * ==========================================================================*/
 
-interface IcdBox {
+/** Guideline-review bookkeeping shared by every editable code box. `original`
+ *  is the prior (AI-predicted or last-confirmed) value restored on revert;
+ *  `reviewedValue` is the value the coder last resolved, so re-opening the same
+ *  value doesn't re-trigger the popover; `note`/`overridden` capture a
+ *  compliance override justification. */
+interface ReviewMeta {
+  original: string
+  reviewedValue: string
+  note?: string
+  overridden?: boolean
+}
+
+interface IcdBox extends ReviewMeta {
   code: string
   description: string
   evidence: string
   verified: boolean
 }
-interface CptBox {
+interface CptBox extends ReviewMeta {
   code: string
   description: string
   evidence: string
@@ -30,16 +44,16 @@ interface CptBox {
   verified: boolean
   mue: number | null
 }
-interface ModBox {
+interface ModBox extends ReviewMeta {
   modifier: string
   description: string
   appliesTo: string
   rationale: string
 }
 
-const EMPTY_ICD: IcdBox = { code: '', description: '', evidence: '', verified: false }
-const EMPTY_CPT: CptBox = { code: '', description: '', evidence: '', units: '', modifiers: [], verified: false, mue: null }
-const EMPTY_MOD: ModBox = { modifier: '', description: '', appliesTo: '', rationale: '' }
+const EMPTY_ICD: IcdBox = { code: '', description: '', evidence: '', verified: false, original: '', reviewedValue: '' }
+const EMPTY_CPT: CptBox = { code: '', description: '', evidence: '', units: '', modifiers: [], verified: false, mue: null, original: '', reviewedValue: '' }
+const EMPTY_MOD: ModBox = { modifier: '', description: '', appliesTo: '', rationale: '', original: '', reviewedValue: '' }
 
 type Sev = 'ok' | 'warning' | 'error' | 'none'
 
@@ -237,6 +251,9 @@ function CodingEngine({ loadedChart = null, onCoded, onRequestNext, queuePositio
   const [hasPredicted, setHasPredicted] = useState(false)
   const [hoveredEvidence, setHoveredEvidence] = useState<string | null>(null)
 
+  // Guideline change-review popover shown when a coder edits a predicted code.
+  const [review, setReview] = useState<ReviewTarget | null>(null)
+
   // Record identifiers (below the pipeline).
   const [claimId, setClaimId] = useState('')
   const [patientName, setPatientName] = useState('')
@@ -245,6 +262,24 @@ function CodingEngine({ loadedChart = null, onCoded, onRequestNext, queuePositio
   const lastPredicted = useRef('')
   const prevLoadedId = useRef<string | null>(null)
   const codedForId = useRef<string | null>(null)
+
+  // Live mirrors of state + the edited input's anchor, read when a debounced
+  // change-review fires (the fire happens ~650ms after the last keystroke, by
+  // which point these refs already reflect the latest render).
+  const icdRef = useRef(icd)
+  const cptRef = useRef(cpt)
+  const modsRef = useRef(mods)
+  const recordRef = useRef(record)
+  const specialtyRef = useRef(specialty)
+  const reviewOpenRef = useRef(false)
+  const reviewTimer = useRef<number | null>(null)
+  const anchorRect = useRef<DOMRect | null>(null)
+  icdRef.current = icd
+  cptRef.current = cpt
+  modsRef.current = mods
+  recordRef.current = record
+  specialtyRef.current = specialty
+  reviewOpenRef.current = review !== null
 
   /** Clear the workspace to start coding the next record. */
   const nextRecord = () => {
@@ -261,6 +296,7 @@ function CodingEngine({ loadedChart = null, onCoded, onRequestNext, queuePositio
     setClaimId('')
     setPatientName('')
     setDos('')
+    setReview(null)
     lastPredicted.current = ''
   }
 
@@ -338,7 +374,16 @@ function CodingEngine({ loadedChart = null, onCoded, onRequestNext, queuePositio
         .then((result) => {
           lastPredicted.current = signature
           setPrediction(result)
-          setIcd(result.icdCodes.map((c) => ({ code: c.code, description: c.description, evidence: c.evidence, verified: c.verified })))
+          setIcd(
+            result.icdCodes.map((c) => ({
+              code: c.code,
+              description: c.description,
+              evidence: c.evidence,
+              verified: c.verified,
+              original: c.code,
+              reviewedValue: c.code,
+            })),
+          )
           setCpt(
             result.cptCodes.map((c) => ({
               code: c.code,
@@ -348,9 +393,20 @@ function CodingEngine({ loadedChart = null, onCoded, onRequestNext, queuePositio
               modifiers: c.modifiers,
               verified: c.verified,
               mue: c.mue,
+              original: c.code,
+              reviewedValue: c.code,
             })),
           )
-          setMods(result.modifiers.map((m) => ({ modifier: m.modifier, description: m.description, appliesTo: m.appliesTo, rationale: m.rationale })))
+          setMods(
+            result.modifiers.map((m) => ({
+              modifier: m.modifier,
+              description: m.description,
+              appliesTo: m.appliesTo,
+              rationale: m.rationale,
+              original: m.modifier,
+              reviewedValue: m.modifier,
+            })),
+          )
           setHasPredicted(true)
           setActiveStage(4)
           setStatus('done')
@@ -371,6 +427,71 @@ function CodingEngine({ loadedChart = null, onCoded, onRequestNext, queuePositio
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [record, specialty])
+
+  /* ---- Guideline change-review orchestration ----
+   * A coder editing a predicted (or newly typed) code schedules a debounced
+   * review; once the value settles into a complete code the popover opens with
+   * a real guideline evaluation. Resolving applies the change (recording any
+   * override note); reverting restores the prior value. */
+  const scheduleReview = (kind: ChangeKind, index: number, el: HTMLInputElement) => {
+    anchorRect.current = el.getBoundingClientRect()
+    if (reviewTimer.current) window.clearTimeout(reviewTimer.current)
+    reviewTimer.current = window.setTimeout(() => openReviewIfNeeded(kind, index), 650)
+  }
+
+  const openReviewIfNeeded = (kind: ChangeKind, index: number) => {
+    if (reviewOpenRef.current) return
+    const list = kind === 'icd' ? icdRef.current : kind === 'cpt' ? cptRef.current : modsRef.current
+    const box = list[index]
+    if (!box) return
+    const value = kind === 'modifier' ? (box as ModBox).modifier : (box as IcdBox | CptBox).code
+    if (!isCompleteCode(kind, value)) return
+    if (value.trim() === box.reviewedValue.trim()) return
+    const evaluation = evaluateChange({
+      kind,
+      value,
+      record: recordRef.current,
+      specialty: specialtyRef.current,
+      cptCodes: cptRef.current.map((c) => c.code).filter(Boolean),
+      icdCodes: icdRef.current.map((c) => c.code).filter(Boolean),
+      units: kind === 'cpt' ? (box as CptBox).units : undefined,
+    })
+    const r = anchorRect.current
+    setReview({
+      kind,
+      index,
+      value,
+      original: box.original,
+      evaluation,
+      anchor: r
+        ? { top: r.top, left: r.left, bottom: r.bottom, width: r.width }
+        : { top: 120, left: 120, bottom: 150, width: 200 },
+      note: box.note ?? '',
+    })
+  }
+
+  const resolveReview = (note: string) => {
+    if (!review) return
+    const { kind, index, value, evaluation } = review
+    const overridden = evaluation.verdict === 'inappropriate'
+    const meta = { reviewedValue: value.trim(), note: note || undefined, overridden }
+    if (kind === 'icd') setIcd((list) => list.map((c, i) => (i === index ? { ...c, ...meta, verified: false } : c)))
+    else if (kind === 'cpt') setCpt((list) => list.map((c, i) => (i === index ? { ...c, ...meta, verified: false } : c)))
+    else setMods((list) => list.map((c, i) => (i === index ? { ...c, ...meta } : c)))
+    setReview(null)
+  }
+
+  const revertReview = () => {
+    if (!review) return
+    const { kind, index, original } = review
+    if (kind === 'icd') setIcd((list) => list.map((c, i) => (i === index ? { ...c, code: original, reviewedValue: original } : c)))
+    else if (kind === 'cpt') setCpt((list) => list.map((c, i) => (i === index ? { ...c, code: original, reviewedValue: original } : c)))
+    else setMods((list) => list.map((c, i) => (i === index ? { ...c, modifier: original, reviewedValue: original } : c)))
+    setReview(null)
+  }
+
+  // Cancel any pending review timer on unmount.
+  useEffect(() => () => { if (reviewTimer.current) window.clearTimeout(reviewTimer.current) }, [])
 
   /* ---- Editors ---- */
   const editIcd = (i: number, patch: Partial<IcdBox>) => {
@@ -432,7 +553,7 @@ function CodingEngine({ loadedChart = null, onCoded, onRequestNext, queuePositio
           const evKey = `icd-${i}`
           return (
             <div
-              className={`ce-box${sevClass(st.sev)}${entry.verified ? ' is-verified' : ''}`}
+              className={`ce-box${sevClass(st.sev)}${entry.verified ? ' is-verified' : ''}${entry.overridden ? ' is-override' : ''}`}
               key={evKey}
               onMouseEnter={() => entry.evidence && setHoveredEvidence(entry.evidence)}
               onMouseLeave={() => setHoveredEvidence(null)}
@@ -443,9 +564,14 @@ function CodingEngine({ loadedChart = null, onCoded, onRequestNext, queuePositio
                   type="text"
                   placeholder="ICD-10"
                   value={entry.code}
-                  onChange={(e) => editIcd(i, { code: e.target.value, verified: false })}
+                  onChange={(e) => { editIcd(i, { code: e.target.value, verified: false }); scheduleReview('icd', i, e.currentTarget) }}
                   spellCheck={false}
                 />
+                {entry.note && (
+                  <span className="ce-box-note" title={`Override note: ${entry.note}`} aria-label="Override note recorded">
+                    <NoteGlyph />
+                  </span>
+                )}
                 {st.sev !== 'none' && (
                   <span className="ce-box-flag" title={st.msg} aria-label={st.msg}>
                     {sevGlyph(st.sev)}
@@ -480,7 +606,7 @@ function CodingEngine({ loadedChart = null, onCoded, onRequestNext, queuePositio
           const st = cptState(entry.code, entry.units)
           return (
             <div
-              className={`ce-box${sevClass(st.sev)}${entry.verified ? ' is-verified' : ''}`}
+              className={`ce-box${sevClass(st.sev)}${entry.verified ? ' is-verified' : ''}${entry.overridden ? ' is-override' : ''}`}
               key={`cpt-${i}`}
               onMouseEnter={() => entry.evidence && setHoveredEvidence(entry.evidence)}
               onMouseLeave={() => setHoveredEvidence(null)}
@@ -491,9 +617,14 @@ function CodingEngine({ loadedChart = null, onCoded, onRequestNext, queuePositio
                   type="text"
                   placeholder="CPT"
                   value={entry.code}
-                  onChange={(e) => editCpt(i, { code: e.target.value, verified: false })}
+                  onChange={(e) => { editCpt(i, { code: e.target.value, verified: false }); scheduleReview('cpt', i, e.currentTarget) }}
                   spellCheck={false}
                 />
+                {entry.note && (
+                  <span className="ce-box-note" title={`Override note: ${entry.note}`} aria-label="Override note recorded">
+                    <NoteGlyph />
+                  </span>
+                )}
                 {st.sev !== 'none' && (
                   <span className="ce-box-flag" title={st.msg} aria-label={st.msg}>
                     {sevGlyph(st.sev)}
@@ -540,16 +671,21 @@ function CodingEngine({ loadedChart = null, onCoded, onRequestNext, queuePositio
           const st = modState(entry.modifier)
           const tip = entry.rationale || st.msg
           return (
-            <div className={`ce-box${sevClass(st.sev)}`} key={`mod-${i}`} title={tip}>
+            <div className={`ce-box${sevClass(st.sev)}${entry.overridden ? ' is-override' : ''}`} key={`mod-${i}`} title={tip}>
               <div className="ce-box-row">
                 <input
                   className="ce-box-input"
                   type="text"
                   placeholder="Mod"
                   value={entry.modifier}
-                  onChange={(e) => editMod(i, { modifier: e.target.value.toUpperCase() })}
+                  onChange={(e) => { editMod(i, { modifier: e.target.value.toUpperCase() }); scheduleReview('modifier', i, e.currentTarget) }}
                   spellCheck={false}
                 />
+                {entry.note && (
+                  <span className="ce-box-note" title={`Override note: ${entry.note}`} aria-label="Override note recorded">
+                    <NoteGlyph />
+                  </span>
+                )}
                 {st.sev !== 'none' && (
                   <span className="ce-box-flag" title={st.msg} aria-label={st.msg}>
                     {sevGlyph(st.sev)}
@@ -793,10 +929,20 @@ function CodingEngine({ loadedChart = null, onCoded, onRequestNext, queuePositio
           </div>
         </div>
       </section>
+
+      {/* ---------- Guideline change-review popover ---------- */}
+      {review && <CodeChangeReview target={review} onConfirm={resolveReview} onRevert={revertReview} />}
     </div>
   )
 }
 
+function NoteGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" width="12" height="12" fill="none" aria-hidden="true">
+      <path d="M4 20.5l1-4L15.5 6a1.5 1.5 0 012.1 0l.9.9a1.5 1.5 0 010 2.1L8 19.5l-4 1z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
+    </svg>
+  )
+}
 function PlusGlyph() {
   return (
     <svg viewBox="0 0 24 24" width="13" height="13" fill="none" aria-hidden="true">

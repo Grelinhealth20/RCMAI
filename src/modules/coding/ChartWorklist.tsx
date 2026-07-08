@@ -3,6 +3,7 @@ import { extractFileText } from './fileText'
 import { extractDosRecords, type ExtractionResult, type ExtractedEncounter } from './api/extractApi'
 import { parseWorklistQuery, applyWorklistFilter, type WorklistFilter } from './api/worklistFilterApi'
 import { newClaimId, newRowId, patientIdFromMrn, type ChartRow } from './worklistTypes'
+import { SPECIALTIES } from './data/codingReference'
 import { mdToHtml } from './recordFormat'
 import '../eligibility/components/SmartFilterBar.css'
 import './ChartWorklist.css'
@@ -93,6 +94,8 @@ function buildRows(result: ExtractionResult): ChartRow[] {
 
 const codesText = (list: string[]): string => (list.length > 0 ? list.join(', ') : '')
 
+const specialtyLabel = (id: ChartRow['specialty']): string => SPECIALTIES.find((s) => s.id === id)?.label ?? id
+
 function StatusBadge({ status }: { status: ChartRow['status'] }) {
   const cls =
     status === 'Coded' ? 'cw-status-coded' : status === 'Submitted' ? 'cw-status-submitted' : status === 'Coding' ? 'cw-status-coding' : 'cw-status-pending'
@@ -145,6 +148,8 @@ function ChartWorklist({ rows, filesReceived, onAddRows, onSendToCoding, onSendF
   const [busy, setBusy] = useState(false)
   const [modalOpen, setModalOpen] = useState(false)
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
+  // The chart whose complete record is open in the View modal, if any.
+  const [viewRow, setViewRow] = useState<ChartRow | null>(null)
   const inputRef = useRef<HTMLInputElement | null>(null)
 
   const toggleExpanded = (key: string) =>
@@ -493,22 +498,27 @@ function ChartWorklist({ rows, filesReceived, onAddRows, onSendToCoding, onSendF
                     <StatusBadge status={r.status} />
                   </td>
                   <td>
-                    {r.status === 'Pending' && (
-                      <button type="button" className="cw-action cw-action-code" onClick={() => onSendToCoding(r.id)}>
-                        Send to Coding
+                    <div className="cw-actions-cell">
+                      <button type="button" className="cw-action cw-action-view" onClick={() => setViewRow(r)}>
+                        View
                       </button>
-                    )}
-                    {r.status === 'Coding' && (
-                      <button type="button" className="cw-action cw-action-code" onClick={() => onSendToCoding(r.id)}>
-                        Resume Coding
-                      </button>
-                    )}
-                    {r.status === 'Coded' && (
-                      <button type="button" className="cw-action cw-action-submit" onClick={() => onSendForSubmission(r.id)}>
-                        Send for Submission
-                      </button>
-                    )}
-                    {r.status === 'Submitted' && <span className="cw-action-done">Submitted</span>}
+                      {r.status === 'Pending' && (
+                        <button type="button" className="cw-action cw-action-code" onClick={() => onSendToCoding(r.id)}>
+                          Send to Coding
+                        </button>
+                      )}
+                      {r.status === 'Coding' && (
+                        <button type="button" className="cw-action cw-action-code" onClick={() => onSendToCoding(r.id)}>
+                          Resume Coding
+                        </button>
+                      )}
+                      {r.status === 'Coded' && (
+                        <button type="button" className="cw-action cw-action-submit" onClick={() => onSendForSubmission(r.id)}>
+                          Send for Submission
+                        </button>
+                      )}
+                      {r.status === 'Submitted' && <span className="cw-action-done">Submitted</span>}
+                    </div>
                   </td>
                 </tr>
               ))
@@ -670,6 +680,114 @@ function ChartWorklist({ rows, filesReceived, onAddRows, onSendToCoding, onSendF
               <button type="button" className="cw-modal-done" onClick={() => setModalOpen(false)} disabled={busy}>
                 {busy ? 'Please wait…' : 'View Charts'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ---------- Chart record viewer (View action) ---------- */}
+      {viewRow && (
+        <div
+          className="cw-modal-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-label={`Chart record for ${viewRow.patientName}`}
+          onClick={() => setViewRow(null)}
+        >
+          <div className="cw-view" onClick={(e) => e.stopPropagation()}>
+            <div className="cw-modal-head">
+              <span className="cw-modal-mark" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none">
+                  <path d="M6 3.5h9l3.5 3.5v13a1 1 0 01-1 1H6a1 1 0 01-1-1V4.5a1 1 0 011-1z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
+                  <path d="M13.5 3.5V8h4.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </span>
+              <div className="cw-modal-titles">
+                <span className="cw-modal-title">{viewRow.patientName}</span>
+                <span className="cw-modal-sub">
+                  {viewRow.claimId} · DOS {viewRow.dos} · {viewRow.payerName}
+                </span>
+              </div>
+              <StatusBadge status={viewRow.status} />
+              <button type="button" className="cw-modal-close" onClick={() => setViewRow(null)} aria-label="Close">
+                ×
+              </button>
+            </div>
+
+            <div className="cw-view-body">
+              <div className="cw-view-grid">
+                <div className="cw-view-field">
+                  <span className="cw-view-label">Patient ID</span>
+                  <span className="cw-view-value cw-mono">{viewRow.patientId}</span>
+                </div>
+                <div className="cw-view-field">
+                  <span className="cw-view-label">Specialty</span>
+                  <span className="cw-view-value">{specialtyLabel(viewRow.specialty)}</span>
+                </div>
+                <div className="cw-view-field">
+                  <span className="cw-view-label">Encounter</span>
+                  <span className="cw-view-value">{viewRow.encounterType}{viewRow.setting ? ` · ${viewRow.setting}` : ''}</span>
+                </div>
+                <div className="cw-view-field">
+                  <span className="cw-view-label">Date of Service</span>
+                  <span className="cw-view-value cw-mono">{viewRow.dos}</span>
+                </div>
+              </div>
+
+              <div className="cw-view-codes">
+                <div className="cw-view-codeline">
+                  <span className="cw-view-code-tag">ICD-10</span>
+                  <span className={viewRow.icd.length ? 'cw-codes' : 'cw-blank'}>{codesText(viewRow.icd) || 'Not yet coded'}</span>
+                </div>
+                <div className="cw-view-codeline">
+                  <span className="cw-view-code-tag">CPT</span>
+                  <span className={viewRow.cpt.length ? 'cw-codes' : 'cw-blank'}>{codesText(viewRow.cpt) || 'Not yet coded'}</span>
+                </div>
+                <div className="cw-view-codeline">
+                  <span className="cw-view-code-tag">Modifiers</span>
+                  <span className={viewRow.modifiers.length ? 'cw-codes' : 'cw-blank'}>{codesText(viewRow.modifiers) || '—'}</span>
+                </div>
+              </div>
+
+              <div className="cw-view-record">
+                <span className="cw-view-label">Complete Clinical Record</span>
+                <div className="cw-record-note" dangerouslySetInnerHTML={{ __html: mdToHtml(viewRow.note) }} />
+              </div>
+            </div>
+
+            <div className="cw-modal-foot">
+              <span className="cw-modal-summary">
+                Chart status: <strong>{viewRow.status === 'Coding' ? 'Coding…' : viewRow.status}</strong>
+              </span>
+              <div className="cw-actions-cell">
+                {(viewRow.status === 'Pending' || viewRow.status === 'Coding') && (
+                  <button
+                    type="button"
+                    className="cw-modal-done"
+                    onClick={() => {
+                      onSendToCoding(viewRow.id)
+                      setViewRow(null)
+                    }}
+                  >
+                    {viewRow.status === 'Coding' ? 'Resume Coding' : 'Send to Coding'}
+                  </button>
+                )}
+                {viewRow.status === 'Coded' && (
+                  <button
+                    type="button"
+                    className="cw-modal-done"
+                    onClick={() => {
+                      onSendForSubmission(viewRow.id)
+                      setViewRow(null)
+                    }}
+                  >
+                    Send for Submission
+                  </button>
+                )}
+                <button type="button" className="cw-view-close-btn" onClick={() => setViewRow(null)}>
+                  Close
+                </button>
+              </div>
             </div>
           </div>
         </div>

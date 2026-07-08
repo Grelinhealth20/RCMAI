@@ -3,6 +3,7 @@ import '../priorauth/PriorAuthAI.css'
 import CodingEngine from './CodingEngine'
 import CodingDashboard from './CodingDashboard'
 import ChartWorklist from './ChartWorklist'
+import { SEED_ROWS, SEED_FILES_RECEIVED } from './data/seedWorklist'
 import type { ChartRow, CodedResult, LoadedChart } from './worklistTypes'
 
 type CodingTab = 'dashboard' | 'engine'
@@ -50,9 +51,12 @@ function CodingAI() {
   const [activeTab, setActiveTab] = useState<CodingTab>('dashboard')
   const active = TABS.find((t) => t.id === activeTab) ?? TABS[0]
 
-  /* ---- Shared chart-worklist state (spans the Dashboard and Engine tabs) ---- */
-  const [rows, setRows] = useState<ChartRow[]>([])
-  const [filesReceived, setFilesReceived] = useState(0)
+  /* ---- Shared chart-worklist state (spans the Dashboard and Engine tabs) ----
+   * Seeded with a live book of work (30 received · 26 DOS · 9 coded · 7 pending
+   * · 10 submitted). Uploading a document still appends new rows on top, so the
+   * extraction flow is unaffected. */
+  const [rows, setRows] = useState<ChartRow[]>(SEED_ROWS)
+  const [filesReceived, setFilesReceived] = useState(SEED_FILES_RECEIVED)
   // Coding queue: the ordered row ids currently being run through the engine.
   const [queue, setQueue] = useState<string[]>([])
   const [queueIndex, setQueueIndex] = useState(0)

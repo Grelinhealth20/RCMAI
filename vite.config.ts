@@ -1939,6 +1939,305 @@ Extract a patient name, a payer/insurance name, and a date of service (as writte
   }
 }
 
+/**
+ * Server-only middleware that parses a natural-language query into a structured
+ * filter for the AR & Denial Management worklist (gpt-4o-mini, cached, bounded).
+ */
+function arSmartFilterApiPlugin(apiKey: string): Plugin {
+  const middleware: Connect.NextHandleFunction = (req, res, next) => {
+    if (req.method !== 'POST' || !req.url?.startsWith('/api/ar-smart-filter')) {
+      next()
+      return
+    }
+
+    void (async () => {
+      try {
+        if (!apiKey) {
+          sendJson(res, 500, { error: 'OPENAI_API_KEY is not configured on the server.' })
+          return
+        }
+
+        const { query } = await readJsonBody(req)
+        if (typeof query !== 'string' || !query.trim()) {
+          sendJson(res, 400, { error: 'A natural language "query" string is required.' })
+          return
+        }
+
+        const cacheKey = cacheKeyFor('ar-smart-filter', { query: query.trim().toLowerCase() })
+        if (serveFromCache(res, cacheKey)) return
+
+        const systemPrompt = `You convert a natural-language request into a strict JSON filter for an accounts-receivable / denial-management claims worklist.
+Return ONLY JSON of this EXACT shape:
+{
+  "status": one of "paid" | "in-process" | "pending-verification" | "appeal" | "resubmitted" | "manual" | "all",
+  "payerName": string or null,
+  "patientName": string or null,
+  "claimId": string or null,
+  "keywords": string[]
+}
+Map phrasing to status: "paid"/"closed"/"posted"→paid; "in process"/"in adjudication"/"pending payer"→in-process; "pending verification"/"needs status check"/"unverified"→pending-verification; "appeal"/"needs appeal"/"appealable denial"→appeal; "resubmit"/"resubmitted"/"corrected claim"→resubmitted; "manual"/"denied"/"hard denial"/"manual intervention"/"write-off"→manual. Use "all" when no status is implied.
+Extract a payer/insurance name, a patient name, and a claim id (as written) if present. keywords = lowercase salient terms not already captured (denial codes like "co-197", CARC/RARC fragments, procedure or aging terms). Respond with ONLY the JSON object.`
+
+        const openaiRes = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+          body: JSON.stringify({
+            model: 'gpt-4o-mini',
+            temperature: 0,
+            max_tokens: 300,
+            response_format: { type: 'json_object' },
+            messages: [
+              { role: 'system', content: systemPrompt },
+              { role: 'user', content: query },
+            ],
+          }),
+        })
+
+        if (!openaiRes.ok) {
+          sendJson(res, 502, { error: `OpenAI API error: ${await openaiRes.text()}` })
+          return
+        }
+
+        const data = (await openaiRes.json()) as { choices: { message: { content: string } }[] }
+        const parsed = JSON.parse(data.choices?.[0]?.message?.content ?? '{}')
+        cacheAndSend(res, cacheKey, parsed)
+      } catch (err) {
+        sendJson(res, 500, { error: err instanceof Error ? err.message : 'Unknown server error' })
+      }
+    })()
+  }
+
+  return {
+    name: 'ar-smart-filter-api',
+    configureServer(server) {
+      server.middlewares.use(middleware)
+    },
+    configurePreviewServer(server) {
+      server.middlewares.use(middleware)
+    },
+  }
+}
+
+/**
+ * Server-only middleware that validates one AR claim across the processing
+ * pipeline (eligibility, claim status, remittance, edits/rules) and routes it
+ * into a decision queue — appeal / calling / resubmission / manual (gpt-4.1,
+ * cached, bounded).
+ */
+function arIntelligenceApiPlugin(apiKey: string): Plugin {
+  const middleware: Connect.NextHandleFunction = (req, res, next) => {
+    if (req.method !== 'POST' || !req.url?.startsWith('/api/ar-intelligence')) {
+      next()
+      return
+    }
+
+    void (async () => {
+      try {
+        if (!apiKey) {
+          sendJson(res, 500, { error: 'OPENAI_API_KEY is not configured on the server.' })
+          return
+        }
+
+        const body = await readJsonBody(req)
+        const claim = body.claim as Record<string, unknown> | undefined
+        if (!claim || typeof claim !== 'object') {
+          sendJson(res, 400, { error: 'A "claim" object is required.' })
+          return
+        }
+
+        const cacheKey = cacheKeyFor('ar-intelligence', { id: String(claim.id ?? ''), signal: JSON.stringify(claim.signal ?? {}) })
+        if (serveFromCache(res, cacheKey)) return
+
+        const systemPrompt = `You are an enterprise accounts-receivable denial-management decision engine. You validate ONE claim across a fixed processing pipeline and route it into exactly one decision queue.
+
+Pipeline stages (return one validation per stage, in THIS order, using these exact "stage" values):
+1. "eligibility"  — Eligibility & Coverage (270/271): was the member covered/eligible on the DOS?
+2. "claim-status" — Claim Status (276/277): what is the payer's current claim status / aging?
+3. "remittance"   — Remittance Analysis (835): interpret any CARC/RARC denial reason.
+4. "rules"        — Edits & Rules Engine: NCCI bundling, timely-filing limits, prior-auth, and COB checks.
+
+Each validation: { "stage": <key>, "status": "pass" | "flag" | "fail", "detail": <one concise clinical/operational sentence grounded in the claim facts> }.
+
+Then route into ONE queue using these rules:
+- "appeal"       → recoverable clinical/soft denials: CARC CO-197 (auth absent), CO-50 (medical necessity), CO-97 (bundling/NCCI). These should be appealed with documentation.
+- "resubmission" → correctable billing errors: CARC CO-16 (missing/invalid info, e.g. RARC N290 rendering NPI), CO-11 (diagnosis-to-procedure mismatch). Fix and submit a corrected claim.
+- "manual"       → hard/true denials needing specialist work: CARC CO-29 (timely filing expired), CO-109 (not covered / wrong payer). Not correctable by resubmission.
+- "calling"      → no denial yet but the claim is stalled with no payer adjudication response (aging with a "pending/no ERA" status): the payer must be called to move it.
+
+Return ONLY JSON of this EXACT shape:
+{
+  "validations": [ {stage, status, detail} x4 in the order above ],
+  "queue": "appeal" | "calling" | "resubmission" | "manual",
+  "confidence": integer 0-100,
+  "rationale": one concise sentence explaining the routing decision,
+  "nextAction": one concise, concrete next step for the AR specialist
+}
+Respond with ONLY the JSON object.`
+
+        const userContent = `Claim facts:\n${JSON.stringify(claim, null, 2)}`
+
+        const openaiRes = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+          body: JSON.stringify({
+            model: 'gpt-4.1',
+            temperature: 0.1,
+            max_tokens: 1200,
+            response_format: { type: 'json_object' },
+            messages: [
+              { role: 'system', content: systemPrompt },
+              { role: 'user', content: userContent },
+            ],
+          }),
+        })
+
+        if (!openaiRes.ok) {
+          sendJson(res, 502, { error: `OpenAI API error: ${await openaiRes.text()}` })
+          return
+        }
+
+        const data = (await openaiRes.json()) as { choices: { message: { content: string } }[] }
+        const parsed = JSON.parse(data.choices?.[0]?.message?.content ?? '{}')
+        cacheAndSend(res, cacheKey, parsed)
+      } catch (err) {
+        sendJson(res, 500, { error: err instanceof Error ? err.message : 'Unknown server error' })
+      }
+    })()
+  }
+
+  return {
+    name: 'ar-intelligence-api',
+    configureServer(server) {
+      server.middlewares.use(middleware)
+    },
+    configurePreviewServer(server) {
+      server.middlewares.use(middleware)
+    },
+  }
+}
+
+/**
+ * Server-only middleware that generates one enterprise-grade, status-specific AR
+ * work note from the exact claim facts (gpt-4.1, cached, bounded). The model
+ * composes and formats a fixed template using only the provided numbers/dates —
+ * it does not invent financials or deadlines.
+ */
+function arNoteApiPlugin(apiKey: string): Plugin {
+  const middleware: Connect.NextHandleFunction = (req, res, next) => {
+    if (req.method !== 'POST' || !req.url?.startsWith('/api/ar-note')) {
+      next()
+      return
+    }
+
+    void (async () => {
+      try {
+        if (!apiKey) {
+          sendJson(res, 500, { error: 'OPENAI_API_KEY is not configured on the server.' })
+          return
+        }
+
+        const body = await readJsonBody(req)
+        const claim = body.claim as Record<string, unknown> | undefined
+        if (!claim || typeof claim !== 'object') {
+          sendJson(res, 400, { error: 'A "claim" facts object is required.' })
+          return
+        }
+
+        const cacheKey = cacheKeyFor('ar-note', { id: String(claim.id ?? ''), status: String(claim.status ?? '') })
+        if (serveFromCache(res, cacheKey)) return
+
+        const systemPrompt = `You are a senior accounts-receivable and denial-management specialist. Write ONE enterprise-grade AR work note for a single claim, ready to paste into a practice management system (PMS) or forward to the provider.
+
+STRICT RULES:
+- Use ONLY the facts provided in the user message. Copy every amount, date, code, and identifier VERBATIM. Never invent or estimate numbers, dates, CARC/RARC codes, or payer policies.
+- Write in a precise, professional AR-specialist voice. Be complete but concise.
+- Follow the template EXACTLY, keeping the section headers. Omit an entire section only when its facts are not provided (e.g. omit DENIAL DETAIL and ROOT-CAUSE ANALYSIS for paid / in-process / pending-verification claims).
+- Tailor the STATUS & ADJUDICATION, ROOT-CAUSE, and ACTION PLAN content to the claim's status:
+  paid → confirm adjudication, payment posting (remit method + trace #), and account closure.
+  in-process → submission, clearinghouse acceptance, current adjudication status, next automated status check.
+  pending-verification → acknowledgment received, status/eligibility verification action, due date.
+  appeal → denial detail, appealability, appeal packet + submission channel, filing deadline.
+  resubmitted → denial detail, root cause, correction applied, corrected-claim resubmission + new claim #, follow-up date.
+  manual → hard-denial detail, analysis, required manual/escalation action, decision-due date.
+
+TEMPLATE (plain text; use "•" bullets and numbered steps exactly as shown):
+ACCOUNTS RECEIVABLE WORK NOTE — {statusLabel}
+Claim {id}  ·  Payer Claim #{payerClaimId}
+Patient: {patient} ({patientId})  |  Payer: {payer}
+Service: {service}   Dx: {diagnosis}
+DOS {dos}  ·  Submitted {submitted}  ·  AR Aging {agingDays} days
+
+FINANCIAL SUMMARY
+• Billed Charges: {billed}
+• Allowed Amount: {allowed}
+• Insurance Paid: {paid}
+• Contractual Adjustment: {adjustment}
+• Patient Responsibility: {patientResponsibility}
+• Outstanding Balance: {outstanding}
+
+STATUS & ADJUDICATION
+<2–4 sentences grounded in the facts and dates>
+
+DENIAL DETAIL
+• CARC {carc}: {carcDesc}
+• RARC {rarc}: {rarcDesc}   (include this line ONLY if an RARC is provided)
+• Classification: {classification}
+
+ROOT-CAUSE ANALYSIS
+<1–3 sentences using the provided rationale>
+
+ACTION PLAN / NEXT STEPS
+1. <concrete step from the recommended action>
+2. <concrete step>
+3. <concrete step if warranted>
+
+FOLLOW-UP
+• Owner: {owner}   • Channel: {channel}   • Target Date: {target}
+
+Return ONLY JSON of the exact shape: { "note": "<the full note text, with real newline characters>" }`
+
+        const userContent = `Claim facts (JSON):\n${JSON.stringify(claim, null, 2)}`
+
+        const openaiRes = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+          body: JSON.stringify({
+            model: 'gpt-4.1',
+            temperature: 0.2,
+            max_tokens: 1100,
+            response_format: { type: 'json_object' },
+            messages: [
+              { role: 'system', content: systemPrompt },
+              { role: 'user', content: userContent },
+            ],
+          }),
+        })
+
+        if (!openaiRes.ok) {
+          sendJson(res, 502, { error: `OpenAI API error: ${await openaiRes.text()}` })
+          return
+        }
+
+        const data = (await openaiRes.json()) as { choices: { message: { content: string } }[] }
+        const parsed = JSON.parse(data.choices?.[0]?.message?.content ?? '{}')
+        cacheAndSend(res, cacheKey, parsed)
+      } catch (err) {
+        sendJson(res, 500, { error: err instanceof Error ? err.message : 'Unknown server error' })
+      }
+    })()
+  }
+
+  return {
+    name: 'ar-note-api',
+    configureServer(server) {
+      server.middlewares.use(middleware)
+    },
+    configurePreviewServer(server) {
+      server.middlewares.use(middleware)
+    },
+  }
+}
+
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
@@ -1960,6 +2259,9 @@ export default defineConfig(({ mode }) => {
       generateRecordApiPlugin(apiKey),
       extractDosApiPlugin(apiKey),
       codingWorklistFilterApiPlugin(apiKey),
+      arSmartFilterApiPlugin(apiKey),
+      arIntelligenceApiPlugin(apiKey),
+      arNoteApiPlugin(apiKey),
     ],
   }
 })

@@ -847,8 +847,8 @@
 
 .cw-table tbody td {
   padding: 12px 16px;
-  color: var(--text-black);
-  font-weight: 600;
+  color: var(--navy);
+  font-weight: 700;
   border-bottom: 1px solid var(--border);
   vertical-align: middle;
 }
@@ -882,7 +882,8 @@
 }
 
 .cw-blank {
-  color: var(--text-faint);
+  color: var(--text-muted);
+  font-weight: 700;
 }
 
 .cw-empty {
@@ -992,5 +993,165 @@
 @media (max-width: 900px) {
   .cw-cards {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* ============================================================================
+ * Action cell — View + status action grouped
+ * ==========================================================================*/
+
+.cw-actions-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.cw-action-view {
+  color: var(--navy);
+  background: var(--surface-tint-strong);
+  border: 1px solid var(--border-strong);
+}
+
+.cw-action-view:hover {
+  background: var(--white);
+  border-color: var(--blue-accent);
+  color: var(--blue-accent);
+  opacity: 1;
+}
+
+/* ============================================================================
+ * Chart record viewer (View action)
+ * ==========================================================================*/
+
+.cw-view {
+  width: 680px;
+  max-width: 100%;
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--white);
+  border: 1px solid var(--border-strong);
+  border-radius: 16px;
+  box-shadow: 0 24px 60px rgba(9, 17, 33, 0.32);
+  overflow: hidden;
+  animation: cw-modal-in 0.16s ease-out;
+}
+
+.cw-view .cw-modal-head {
+  align-items: center;
+}
+
+.cw-view-body {
+  padding: 16px 18px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.cw-view-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 18px;
+  padding: 12px 14px;
+  background: var(--surface-tint);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.cw-view-field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.cw-view-label {
+  font-size: 9.5px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-faint);
+}
+
+.cw-view-value {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--navy);
+}
+
+.cw-view-codes {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.cw-view-codeline {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.cw-view-code-tag {
+  flex: none;
+  width: 74px;
+  font-size: 9.5px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--blue-accent);
+}
+
+.cw-view-codeline .cw-codes {
+  max-width: none;
+}
+
+.cw-view-record {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.cw-view-record .cw-record-note {
+  max-height: none;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-tint);
+}
+
+.cw-view-close-btn {
+  padding: 9px 16px;
+  border-radius: 9px;
+  border: 1px solid var(--border-strong);
+  background: var(--white);
+  color: var(--navy);
+  font-size: 12.5px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+
+.cw-view-close-btn:hover {
+  border-color: var(--blue-accent);
+  color: var(--blue-accent);
+  background: var(--surface-tint);
+}
+
+@keyframes cw-modal-in {
+  from { opacity: 0; transform: translateY(6px) scale(0.99); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cw-view { animation: none; }
+}
+
+@media (max-width: 560px) {
+  .cw-view-grid {
+    grid-template-columns: 1fr;
   }
 }

@@ -1,0 +1,429 @@
+.ari {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* ============================================================================
+ * Header
+ * ==========================================================================*/
+
+.ari-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.ari-head-titles {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-width: 640px;
+}
+
+.ari-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--navy);
+}
+
+.ari-sub {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+.ari-live-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.3px;
+  color: var(--teal-accent-bright);
+  background: color-mix(in srgb, var(--teal-accent-bright) 14%, var(--white));
+}
+
+.ari-live-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--teal-accent-bright);
+  animation: ari-pulse 1.4s ease-in-out infinite;
+}
+
+.ari-head-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.ari-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 18px;
+  border: 1.5px solid var(--border-strong);
+  border-radius: 10px;
+  background: var(--white);
+  color: var(--navy);
+  font-size: 12.5px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease, filter 0.15s ease;
+}
+.ari-btn:hover:not(:disabled) {
+  border-color: var(--blue-accent);
+  color: var(--blue-accent);
+  background: var(--surface-tint);
+}
+.ari-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.ari-btn-primary {
+  border: none;
+  color: var(--white);
+  background: linear-gradient(135deg, var(--blue-accent-2, var(--blue-accent)), var(--navy));
+  box-shadow: 0 5px 14px rgba(39, 83, 179, 0.3);
+}
+.ari-btn-primary:hover:not(:disabled) {
+  filter: brightness(1.06);
+  color: var(--white);
+  background: linear-gradient(135deg, var(--blue-accent-2, var(--blue-accent)), var(--navy));
+}
+
+/* ============================================================================
+ * Decision queue counters
+ * ==========================================================================*/
+
+.ari-queues {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.ari-queue {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1.5px solid var(--border-strong);
+  background: var(--white);
+  border-left-width: 4px;
+}
+
+.ari-queue-count {
+  font-size: 24px;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--navy);
+}
+
+.ari-queue-label {
+  font-size: 12.5px;
+  font-weight: 800;
+  color: var(--navy);
+}
+
+.ari-queue-blurb {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--text-muted);
+  line-height: 1.35;
+}
+
+.ari-queue.q-appeal { border-left-color: #d97706; }
+.ari-queue.q-calling { border-left-color: #0ea5e9; }
+.ari-queue.q-resubmit { border-left-color: var(--teal-accent-bright); }
+.ari-queue.q-manual { border-left-color: var(--danger); }
+
+@media (max-width: 860px) {
+  .ari-queues { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* ============================================================================
+ * Per-claim pipeline card
+ * ==========================================================================*/
+
+.ari-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.ari-claim {
+  padding: 14px 16px;
+  border: 1.5px solid var(--border-strong);
+  border-radius: 14px;
+  background: var(--white);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.ari-claim.is-running {
+  border-color: var(--blue-accent);
+  box-shadow: 0 0 0 3px rgba(39, 83, 179, 0.08);
+}
+.ari-claim.is-done {
+  border-left-width: 4px;
+}
+.ari-claim.is-done.q-appeal { border-left-color: #d97706; }
+.ari-claim.is-done.q-calling { border-left-color: #0ea5e9; }
+.ari-claim.is-done.q-resubmit { border-left-color: var(--teal-accent-bright); }
+.ari-claim.is-done.q-manual { border-left-color: var(--danger); }
+
+.ari-claim-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.ari-claim-id {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.ari-claim-code {
+  font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  font-size: 12.5px;
+  font-weight: 800;
+  color: var(--navy);
+}
+
+.ari-claim-patient {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+.ari-claim-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+.ari-dot { color: var(--text-faint); }
+.ari-mono { font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace; color: var(--navy); }
+
+.ari-signal {
+  margin-left: auto;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--navy);
+  background: var(--surface-tint-strong);
+  border: 1px solid var(--border);
+  max-width: 380px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ari-run-one {
+  padding: 6px 14px;
+  border: none;
+  border-radius: 8px;
+  background: linear-gradient(135deg, var(--blue-accent-2, var(--blue-accent)), var(--navy));
+  color: var(--white);
+  font-size: 11.5px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.ari-run-one:hover { filter: brightness(1.06); }
+
+/* ---------- Horizontal tree pipeline ---------- */
+.ari-pipe {
+  display: flex;
+  align-items: stretch;
+  gap: 20px;
+  overflow-x: auto;
+  padding: 4px 2px 8px;
+}
+
+.ari-node {
+  position: relative;
+  flex: 1 0 150px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 11px;
+  border: 1.5px solid var(--border-strong);
+  border-radius: 11px;
+  background: var(--surface-tint);
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+/* connector line to the next node */
+.ari-node:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  right: -20px;
+  width: 20px;
+  height: 2px;
+  background: var(--border-strong);
+  transform: translateY(-50%);
+}
+
+.ari-node-dot {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  background: var(--white);
+  border: 1.5px solid var(--border-strong);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.ari-node-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.ari-node-label {
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--navy);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ari-node-caption {
+  font-size: 9.5px;
+  font-weight: 700;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ari-node-root .ari-node-dot { color: var(--navy); }
+
+/* Stage states */
+.ari-stage.is-active {
+  border-color: var(--blue-accent);
+  background: color-mix(in srgb, var(--blue-accent) 8%, var(--white));
+}
+.ari-stage.is-active .ari-node-dot {
+  border-color: var(--blue-accent);
+  color: var(--blue-accent);
+}
+.ari-stage.is-checked .ari-node-dot,
+.ari-stage.is-pass .ari-node-dot {
+  border-color: var(--success-live);
+  background: var(--success-live);
+  color: var(--white);
+}
+.ari-stage.is-flag .ari-node-dot {
+  border-color: var(--warning);
+  background: var(--warning);
+  color: var(--navy);
+}
+.ari-stage.is-fail .ari-node-dot {
+  border-color: var(--danger);
+  background: var(--danger);
+  color: var(--white);
+}
+.ari-stage.is-checked::after,
+.ari-stage.is-pass::after,
+.ari-stage.is-flag::after,
+.ari-stage.is-fail::after {
+  background: var(--blue-accent);
+}
+
+/* Decision node */
+.ari-node-decision {
+  border-style: dashed;
+}
+.ari-node-decision.is-appeal { border-style: solid; border-color: #d97706; background: rgba(217, 119, 6, 0.08); }
+.ari-node-decision.is-calling { border-style: solid; border-color: #0ea5e9; background: rgba(14, 165, 233, 0.08); }
+.ari-node-decision.is-resubmission { border-style: solid; border-color: var(--teal-accent-bright); background: color-mix(in srgb, var(--teal-accent-bright) 8%, var(--white)); }
+.ari-node-decision.is-manual { border-style: solid; border-color: var(--danger); background: var(--danger-bg); }
+.ari-node-decision.is-appeal .ari-node-dot { border-color: #d97706; background: #d97706; color: var(--white); }
+.ari-node-decision.is-calling .ari-node-dot { border-color: #0ea5e9; background: #0ea5e9; color: var(--white); }
+.ari-node-decision.is-resubmission .ari-node-dot { border-color: var(--teal-accent-bright); background: var(--teal-accent-bright); color: var(--white); }
+.ari-node-decision.is-manual .ari-node-dot { border-color: var(--danger); background: var(--danger); color: var(--white); }
+
+/* ---------- Outcome ---------- */
+.ari-outcome {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--surface-tint);
+  border: 1px solid var(--border);
+}
+
+.ari-outcome-line {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--navy);
+  line-height: 1.45;
+}
+.ari-outcome-line strong {
+  font-weight: 800;
+}
+
+.ari-error {
+  margin-top: 10px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--danger);
+  background: var(--danger-bg);
+}
+
+/* ---------- Spinners ---------- */
+.ari-spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.5);
+  border-top-color: var(--white);
+  animation: ari-spin 0.7s linear infinite;
+}
+.ari-spinner-sm {
+  width: 13px;
+  height: 13px;
+  border-color: rgba(39, 83, 179, 0.25);
+  border-top-color: var(--blue-accent);
+}
+
+@keyframes ari-spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes ari-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ari-live-dot, .ari-spinner { animation: none; }
+}
