@@ -220,12 +220,28 @@ function MedicalNecessityStep({ value, onChange, patientPayer, facilityProvider,
         <div className="mn-doc-scroll">
           {value.document ? (
             <article className="mn-doc-paper">{renderMarkdown(value.document)}</article>
+          ) : status === 'loading' ? (
+            <div className="mn-loading">
+              <p className="mn-loading-caption">
+                <span className="ppf-spinner" aria-hidden="true" />
+                Drafting a payer-specific medical necessity letter…
+              </p>
+              <div className="mn-skeleton" aria-hidden="true">
+                <span className="mn-sk-line w-40 mn-sk-head" />
+                <span className="mn-sk-line w-90" />
+                <span className="mn-sk-line w-100" />
+                <span className="mn-sk-line w-80" />
+                <span className="mn-sk-line w-95" />
+                <span className="mn-sk-line w-55 mn-sk-head" />
+                <span className="mn-sk-line w-100" />
+                <span className="mn-sk-line w-85" />
+                <span className="mn-sk-line w-70" />
+              </div>
+            </div>
           ) : (
             <div className="mn-empty">
               {canGenerate
-                ? status === 'loading'
-                  ? 'Drafting a payer-specific medical necessity letter…'
-                  : 'Ready — the letter generates automatically.'
+                ? 'Ready — the letter generates automatically.'
                 : 'Complete the payer (Step 1) and diagnosis/procedure codes (Step 3) to generate a payer-specific medical necessity letter.'}
             </div>
           )}

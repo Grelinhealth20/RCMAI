@@ -4,12 +4,14 @@ import PriorAuthorizationAI from './PriorAuthorizationAI'
 import CodingAI from './CodingAI'
 import ARDenialManagement from './ARDenialManagement'
 import AppealsAI from './AppealsAI'
+import PerformanceAI from './PerformanceAI'
 import {
   EligibilityIcon,
   PriorAuthIcon,
   CodingIcon,
   ARDenialIcon,
   AppealsIcon,
+  PerformanceIcon,
 } from './icons'
 
 export interface AIModule {
@@ -25,4 +27,5 @@ export const modules: AIModule[] = [
   { id: 'coding-ai', name: 'Coding AI', icon: CodingIcon, Component: CodingAI },
   { id: 'ar-denial-management', name: 'AR & Denial Management', icon: ARDenialIcon, Component: ARDenialManagement },
   { id: 'appeals-ai', name: 'Appeals AI', icon: AppealsIcon, Component: AppealsAI },
+  { id: 'performance-ai', name: 'Performance AI', icon: PerformanceIcon, Component: PerformanceAI },
 ]

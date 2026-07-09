@@ -22,7 +22,10 @@ function markdownToHtml(md: string): string {
   }
   for (const raw of md.split('\n')) {
     const line = raw.trimEnd()
-    if (/^###\s+/.test(line)) {
+    if (/^-{2,}\s*PAGEBREAK\s*-{2,}$/i.test(line.trim())) {
+      flush()
+      out.push('<div style="page-break-before:always; mso-special-character:line-break;"></div>')
+    } else if (/^###\s+/.test(line)) {
       flush()
       out.push(`<h3>${inline(line.replace(/^###\s+/, ''))}</h3>`)
     } else if (/^##\s+/.test(line)) {

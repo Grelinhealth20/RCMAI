@@ -564,6 +564,149 @@
   margin-bottom: 5px;
   font-weight: 500;
 }
+/* ---------- PA package generation loader ---------- */
+.fin-pkg-loader {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 26px 28px;
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 1px 3px rgba(9, 17, 33, 0.06);
+}
+.fin-pkg-loader-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.fin-pkg-loader-spinner {
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  border: 3px solid rgba(39, 83, 179, 0.18);
+  border-top-color: var(--blue-accent);
+  border-radius: 50%;
+  animation: table-spin 0.7s linear infinite;
+}
+.fin-pkg-loader-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--navy);
+}
+.fin-pkg-loader-sub {
+  margin: 2px 0 0;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+.fin-pkg-loader-sub strong {
+  color: var(--blue-accent);
+  font-weight: 800;
+}
+.fin-pkg-process {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+.fin-pkg-step {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  font-size: 13px;
+  font-weight: 700;
+  transition: color 0.3s ease, opacity 0.3s ease;
+}
+.fin-pkg-step-dot {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  font-size: 11px;
+  font-weight: 800;
+  border: 1.5px solid var(--border);
+  color: var(--text-muted);
+  background: var(--white);
+  transition: all 0.3s ease;
+}
+.fin-pkg-step-pulse {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: fin-pkg-pulse 0.9s ease-in-out infinite;
+}
+@keyframes fin-pkg-pulse {
+  0%, 100% { transform: scale(0.6); opacity: 0.5; }
+  50% { transform: scale(1); opacity: 1; }
+}
+.fin-pkg-step.is-pending {
+  color: var(--text-muted);
+  opacity: 0.6;
+}
+.fin-pkg-step.is-active {
+  color: var(--blue-accent);
+}
+.fin-pkg-step.is-active .fin-pkg-step-dot {
+  border-color: var(--blue-accent);
+  color: var(--blue-accent);
+  box-shadow: 0 0 0 4px rgba(39, 83, 179, 0.12);
+}
+.fin-pkg-step.is-done {
+  color: var(--navy);
+}
+.fin-pkg-step.is-done .fin-pkg-step-dot {
+  border-color: var(--success);
+  background: var(--success);
+  color: var(--white);
+}
+.fin-pkg-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 4px;
+}
+.fin-sk-line {
+  height: 11px;
+  border-radius: 6px;
+  background: linear-gradient(90deg, #eef1f7 25%, #e2e7f0 37%, #eef1f7 63%);
+  background-size: 400% 100%;
+  animation: fin-sk-shimmer 1.4s ease infinite;
+}
+.fin-sk-line.w-60 { width: 60%; }
+.fin-sk-line.w-70 { width: 70%; }
+.fin-sk-line.w-80 { width: 80%; }
+.fin-sk-line.w-90 { width: 90%; }
+.fin-sk-line.w-95 { width: 95%; }
+.fin-sk-line.w-100 { width: 100%; }
+@keyframes fin-sk-shimmer {
+  0% { background-position: 100% 0; }
+  100% { background-position: 0 0; }
+}
+
+.fin-doc-pagebreak {
+  position: relative;
+  margin: 26px 0;
+  border: none;
+  border-top: 2px dashed var(--border);
+}
+.fin-doc-pagebreak::after {
+  content: 'PAGE BREAK';
+  position: absolute;
+  top: -8px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 0 10px;
+  background: var(--white);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  color: var(--text-muted);
+}
 
 /* ---------- Override modal ---------- */
 

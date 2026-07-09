@@ -1,7 +1,10 @@
-import PerformanceDashboard from './performance/PerformanceDashboard'
+import EraDashboard from './performance/era/EraDashboard'
 
+/**
+ * Performance AI — ERA / EOB posting operations workspace.
+ */
 function PerformanceAI() {
-  return <PerformanceDashboard />
+  return <EraDashboard />
 }
 
 export default PerformanceAI

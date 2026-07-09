@@ -524,6 +524,8 @@ Return ONLY strict JSON of this EXACT shape:
   "rationale": ["<payer-specific bullet on why the letter satisfies THIS payer's PA/medical-necessity criteria>", ...]
 }
 
+SERVICE-SPECIFIC TAILORING: First infer the SERVICE CATEGORY from the requested CPT(s) — advanced imaging (MRI/CT/PET), surgical/procedural, infusion/injectable drug, DME, wound care/skin substitute, sleep/neurodiagnostic, genetic/molecular lab, etc. — and tailor the clinical argument and the evidence standard you cite to THAT category (e.g., ACR Appropriateness Criteria for imaging; NASS/NIA for spine; ACC/AHA for cardiac; NCCN for oncology drugs; MolDX for molecular labs; Wound Healing Society for wound care). The justification, the alternatives you weigh, and the coverage criteria you address must all be specific to this exact service, not generic.
+
 DOCUMENT — write a complete, formal, submission-ready Letter of Medical Necessity in Markdown with ALL of the following, in order:
 
 1. **Letterhead** — rendering provider name & credentials, facility name, facility address and phone, provider NPI and facility NPI (use the values provided).
@@ -531,19 +533,24 @@ DOCUMENT — write a complete, formal, submission-ready Letter of Medical Necess
 3. **RE: line** with patient name, DOB, member ID, group number, payer ID, requested CPT code(s) + description, date of service, and units.
 4. **Salutation** ("To the Utilization Management / Medical Review Team,").
 5. ## Clinical Summary — 2-3 sentence overview: patient, presenting problem, and the specific service being requested.
-6. ## Diagnoses — a Markdown list of every ICD-10 code with its description; identify the primary diagnosis.
-7. ## History of Present Illness & Objective Findings — a detailed narrative synthesized from the record: symptom onset/duration, severity, functional impairment, pertinent exam findings, prior imaging/labs. Quote objective findings faithfully.
-8. ## Conservative & Prior Treatment — enumerate every prior therapy documented (modality, duration, outcome/response). This is the pivotal section most payers scrutinize; be specific about what failed and for how long.
-9. ## Medical Necessity Justification — explicitly link EACH requested CPT to its supporting ICD-10 diagnosis, and explain why the service is medically necessary now (what it will rule in/out, how it changes management, why lesser alternatives are insufficient). Reference applicable evidence-based/specialty-society standards (e.g., ACR Appropriateness Criteria, NASS, ACC/AHA) where relevant.
-10. ## <Payer>-Specific Coverage Criteria Addressed — map the case to the NAMED payer's known utilization-management / medical-policy expectations (documented conservative-therapy failure duration, red-flag or severity criteria, step therapy, imaging appropriateness). Cite the payer's policy by name/number if a well-known one applies; otherwise state the standard criterion the payer applies. Reference the payer BY NAME here and throughout.
-11. ## Requested Determination — a clear request to approve the specific CPT(s), units, and DOS; note clinical risk of delay/denial.
-12. **Closing** — "Respectfully submitted," followed by a full provider signature block: rendering provider name, credentials, NPI, facility, and phone. Add an ordering-provider reference if distinct.
+6. ## Diagnoses — a Markdown list of every ICD-10 code with its description; identify the primary diagnosis and note how each supports the requested service.
+7. ## History of Present Illness & Objective Findings — a detailed narrative synthesized from the record: symptom onset/duration, severity, progression, functional impairment, pertinent exam findings, prior imaging/labs with values/measurements. Quote objective findings faithfully.
+8. ## Conservative & Prior Treatment — enumerate every prior therapy documented (modality, dose/frequency, duration, outcome/response). This is the pivotal section most payers scrutinize; be specific about what was tried, for how long, and why it failed, was not tolerated, or is contraindicated.
+9. ## Functional Impact & Symptom Burden — the documented effect on activities of daily living, work, mobility, or quality of life, and any objective severity scores/measures in the record.
+10. ## Medical Necessity Justification — explicitly link EACH requested CPT to its supporting ICD-10 diagnosis, and explain why the service is medically necessary NOW: what it will rule in/out, how it will change management, and why it is the least-costly medically appropriate option. Cite the service-specific evidence standard identified above.
+11. ## Alternatives Considered — the lower-cost or more-conservative alternatives that were considered or attempted and the clinical reason each is insufficient or inappropriate for this patient.
+12. ## Clinical Risk of Delay or Denial — the specific clinical consequences of NOT authorizing (or delaying) the service for this patient.
+13. ## <Payer>-Specific Coverage Criteria Addressed — map the case to the NAMED payer's known utilization-management / medical-policy expectations (documented conservative-therapy failure duration, red-flag or severity criteria, step therapy, imaging/site-of-service appropriateness). Present each key criterion as its own bullet with an explicit **Met / Documentation attached** determination. Cite the payer's policy by name/number if a well-known one applies; otherwise state the standard criterion the payer applies. Reference the payer BY NAME here and throughout.
+14. ## Requested Determination — a clear request to approve the specific CPT(s), units, and DOS; restate the requested authorization span and note clinical risk of delay/denial.
+15. **Closing** — "Respectfully submitted," followed by a full provider signature block: rendering provider name, credentials, NPI, facility, and phone. Add an ordering-provider reference if distinct.
 
 STRICT ACCURACY RULES (target ≥95% factual accuracy):
-- Every clinical statement MUST be traceable to the provided record or structured data. Use ONLY facts present in the input. NEVER invent findings, dates, measurements, medications, laterality, or history. If a clinically expected detail is absent, write "as documented" or omit it — do not fabricate.
+- Every clinical statement MUST be traceable to the provided record or structured data. Use ONLY facts present in the input. NEVER invent findings, dates, measurements, medications, laterality, or history. If a clinically expected detail is absent, write "as documented in the medical record" or omit it — do not fabricate.
 - Restate the patient identifiers, diagnoses (ICD-10), and procedures (CPT) EXACTLY as provided — do not alter, add, re-code, or upcode them, and do not change units or dates of service.
 - Reproduce the conservative-therapy details (modalities, durations, outcomes) exactly as they appear in the record — payers verify these; any inaccuracy causes denial.
 - Tie the requested service to the documented findings and to the NAMED payer's specific medical-policy criteria; do not assert criteria the record does not support.
+- LENGTH: The letter MUST be a MINIMUM of 2000 words. Reach this by fully developing the History of Present Illness, Conservative & Prior Treatment, Medical Necessity Justification, Alternatives Considered, and payer coverage-criteria sections with case-specific clinical depth. Do NOT pad with repetition or filler, and never fabricate facts to add length; be exhaustive using the provided record.
+- Be comprehensive — every section above is required and must contain real, case-specific content; a complete letter runs 3-4 pages. Do not collapse or shortcut sections.
 - Professional, formal, detailed clinical register; well-formatted; ready to fax/upload to the payer.
 
 RATIONALE — 4-6 concise, payer-specific bullets, each naming the exact criterion or code linkage it satisfies for THIS payer.`
@@ -554,7 +561,8 @@ RATIONALE — 4-6 concise, payer-specific bullets, each naming the exact criteri
       body: JSON.stringify({
         model: 'gpt-4.1',
         temperature: 0.12,
-        max_tokens: 4096,
+        // Generous ceiling so a 2000+ word letter (plus JSON escaping) is never truncated.
+        max_tokens: 12000,
         response_format: { type: 'json_object' },
         messages: [
           { role: 'system', content: systemPrompt },
@@ -567,16 +575,40 @@ RATIONALE — 4-6 concise, payer-specific bullets, each naming the exact criteri
       return { status: 502, json: { error: `OpenAI API error: ${await openaiRes.text()}` } }
     }
 
-    const data = (await openaiRes.json()) as { choices: { message: { content: string } }[] }
-    const parsed = JSON.parse(data.choices?.[0]?.message?.content ?? '{}') as Record<string, unknown>
+    const data = (await openaiRes.json()) as {
+      choices: { message: { content: string }; finish_reason?: string }[]
+    }
+    const choice = data.choices?.[0]
+    const raw = choice?.message?.content ?? ''
 
-    const document = typeof parsed.document === 'string' ? parsed.document.trim() : ''
-    const rationale = Array.isArray(parsed.rationale)
-      ? parsed.rationale.filter((r): r is string => typeof r === 'string' && r.trim().length > 0)
-      : []
+    let document = ''
+    let rationale: string[] = []
+    try {
+      const parsed = JSON.parse(raw) as Record<string, unknown>
+      document = typeof parsed.document === 'string' ? parsed.document.trim() : ''
+      rationale = Array.isArray(parsed.rationale)
+        ? parsed.rationale.filter((r): r is string => typeof r === 'string' && r.trim().length > 0)
+        : []
+    } catch {
+      // Truncated/invalid JSON (e.g. hit the token ceiling mid-string): salvage the
+      // letter body from the "document" field rather than failing the whole request.
+      const m = raw.match(/"document"\s*:\s*"((?:\\.|[^"\\])*)/)
+      if (m) {
+        try {
+          document = JSON.parse(`"${m[1]}"`) as string
+        } catch {
+          document = m[1].replace(/\\n/g, '\n').replace(/\\"/g, '"').replace(/\\t/g, '\t')
+        }
+        document = document.trim()
+      }
+    }
 
-    if (!document) {
-      return { status: 502, json: { error: 'The model did not return a document.' } }
+    if (!document || document.length < 40) {
+      return { status: 502, json: { error: 'The model did not return a usable document.' } }
+    }
+    if (choice?.finish_reason === 'length') {
+      document +=
+        '\n\n---\n\n*Note: this letter reached the generation length limit and may be incomplete. Review the closing sections before submission.*'
     }
 
     return cacheAndSend(cacheKey, { document, rationale })
@@ -804,26 +836,84 @@ async function handlePaPackage(body: Record<string, unknown>, apiKey: string): P
     const cached = serveFromCache(cacheKey)
     if (cached) return cached
 
-    const systemPrompt = `You are a prior authorization package compiler. Produce a COMPLETE, enterprise-grade, PAYER-SPECIFIC Prior Authorization submission packet in Markdown, ready to transmit to the named payer. This is not a generic template — tailor it to the payer, procedure and diagnoses provided.
+    const systemPrompt = `You are a senior prior-authorization package compiler for a U.S. revenue-cycle operation. Produce a COMPLETE, exhaustive, enterprise-grade, PAYER-SPECIFIC Prior Authorization submission packet in Markdown that is READY TO FAX DIRECTLY to the named payer's Prior Authorization / Utilization Management department. This is a legal-grade clinical document — not a generic template. Tailor every section to the specific payer, procedure(s), and diagnoses provided, and be thorough: a real reviewer must be able to approve on first pass WITHOUT requesting additional information.
 
-Return ONLY strict JSON of this EXACT shape:
-{ "document": "<full PA package in Markdown>" }
+OUTPUT FORMAT: Return the full PA package as GitHub-flavored Markdown ONLY. Do NOT wrap it in JSON. Do NOT use code fences. Do NOT add any preamble, explanation, or trailing commentary — output the document and nothing else, beginning with the "# PRIOR AUTHORIZATION REQUEST — FAX COVER SHEET" heading.
 
-The package MUST include, in order, with '##' section headings:
-1. Header / Cover Sheet — TO: <Payer> Prior Authorization / Utilization Management (use PA fax/portal/address if provided); FROM: rendering provider, credentials, NPI, facility, facility NPI, address, phone; submission method; use the provided "submissionDate" as the date.
-2. ## Authorization Request Summary — a bulleted key/value list (each line "- **Field:** value"): Patient name, DOB, Member ID, Group #, Payer ID, Requested CPT(s) + description, Primary ICD-10, Date of Service, Units, Place of Service.
-3. ## Diagnoses — list every ICD-10 code + description (identify primary).
-4. ## Requested Services — list every CPT + description + units, each linked to its supporting ICD-10.
-5. ## Clinical Justification Summary — concise medical-necessity rationale synthesized from the record; reference conservative-therapy failure and payer criteria by name.
-6. ## Enclosed Documentation — checklist of the required documents with [x] attached / [ ] pending status from the provided document list.
-7. ## Payer-Specific Compliance — brief statement mapping the request to <Payer>'s medical policy criteria.
-8. ## Attestation & Signature — provider attestation of medical necessity and accuracy, signature block (name, credentials, NPI, date).
+AUTHORITATIVE PAYER CONTACT FACTS: The request payload includes a "payer" object with directory-verified contact data — payerId, paPhone, paFax, urgentPaFax, mailingAddress, submissionMethod, portalUrl. These are AUTHORITATIVE. Use them VERBATIM. NEVER invent, guess, reformat, or "correct" a fax number, payer ID, address, phone, or portal URL. If a contact field is empty, write "Not on file — verify via payer provider manual" rather than fabricating one.
+
+Insert a line containing exactly ---PAGEBREAK--- (on its own line) between the fax cover sheet and the clinical packet, and between the clinical packet and the attestation page. This drives page breaks in the faxed output.
+
+The package MUST contain, IN THIS ORDER:
+
+=== PAGE 1 — FAX COVER SHEET ===
+# PRIOR AUTHORIZATION REQUEST — FAX COVER SHEET
+A bulleted key/value block (each line "- **Field:** value"):
+- **TO:** <Payer> — Prior Authorization / Utilization Management
+- **FAX:** <payer.paFax> (and if the request is expedited/urgent and payer.urgentPaFax exists, add "Urgent line: <payer.urgentPaFax>")
+- **PAYER ID:** <payer.payerId>
+- **FROM:** <rendering provider name, credentials> — <facility name>
+- **RETURN FAX / PHONE:** <facility phone if provided>
+- **DATE:** <submissionDate>
+- **RE:** Prior authorization for <primary CPT description> — <patient name>
+- **MEMBER ID:** <member ID>  ·  **DOB:** <dob>
+- **TOTAL PAGES:** <integer estimate of total pages including this cover sheet and every enclosed document marked attached — count 1 cover + ~2 packet pages + 1 per attached document>
+- **PRIORITY:** Standard (or "EXPEDITED / URGENT — 72-hour review requested" only if the clinical record documents urgency)
+Then a bold HIPAA confidentiality line: "**CONFIDENTIAL — PROTECTED HEALTH INFORMATION.** This transmission contains information protected under HIPAA, intended solely for the named payer's utilization-management review. If received in error, notify the sender immediately and destroy all copies."
+Then: ---PAGEBREAK---
+
+=== CLINICAL PACKET ===
+## Authorization Request Summary
+Bulleted key/value list: Patient name, DOB, Gender, Member ID, Group #, Payer ID, Subscriber (if dependent), Rendering Provider + NPI, Ordering Provider + NPI, Facility + NPI + Tax ID, Requested CPT(s) + description, Primary ICD-10, Date(s) of Service, Total Units, Place of Service, Submission Method.
+
+## Diagnoses
+Every ICD-10 code + full description; explicitly mark the PRIMARY diagnosis and list secondaries in order.
+
+## Requested Services
+Every CPT code + description + units, each on its own bullet, EXPLICITLY LINKED to the supporting ICD-10 code(s) that establish medical necessity for that service (e.g. "- **99213** Office visit — 1 unit — supports diagnosis E11.9"). Note any modifiers if provided.
+
+## Medical Necessity Crosswalk
+For EACH requested CPT, one bullet mapping it to the specific diagnosis it treats AND the coverage rationale ("- **<CPT>** → **<ICD-10>**: <one line on why this service is medically necessary for this diagnosis>"). This is the code-linkage a UM reviewer checks first.
+
+## Clinical Justification & Medical Necessity
+A thorough, well-organized narrative synthesized ONLY from the provided medical record and medical-necessity letter. Use these '###' subsections, each with substantive content (write "Not documented in the submitted record." for any element the record does not support — never fabricate):
+### Presenting Problem & Severity
+### Relevant History & Comorbidities
+### Objective Findings & Diagnostic Results
+### Conservative / Prior Treatments Trialed
+List each first-line/conservative therapy already attempted, its duration, and the documented outcome (failure, intolerance, or contraindication) — this is the single most scrutinized element for most payers.
+### Rationale for the Requested Service
+Why this specific service is the appropriate, least-costly medically necessary next step, and the risk of NOT authorizing it.
+### Expected Clinical Benefit & Treatment Goals
+
+## Payer-Specific Medical Policy Compliance
+Map the request to the NAMED payer's applicable medical policy. Cite the specific policy/bulletin by name or number when a well-known one applies (e.g. Aetna Clinical Policy Bulletin, UnitedHealthcare/Optum medical policy, Cigna coverage policy, Anthem/Elevance clinical guideline, or ACR Appropriateness Criteria / CMS NCD-LCD for imaging). Present each key coverage criterion as its own bullet with an explicit **Met / Not met / Documentation attached** determination and a one-line justification. Address step therapy, prior imaging, specialist evaluation, and site-of-service rules where relevant to this procedure.
+
+## Requested Authorization Period & Units
+State the specific date(s) of service or service span, the total units/visits requested per CPT, and the authorization duration being requested (e.g. single date of service, or a 90-day/6-visit span if the record supports a course of treatment). Note the place of service.
+
+## Enclosed Documentation
+Checklist of the required documents from the provided document list using "- [x] <name> — attached" or "- [ ] <name> — PENDING" per its attached status. After the list, add "- **Records enclosed with this fax:** <count of attached documents>".
+
+## Determination Requested
+State the review type requested (Standard, or Expedited/Urgent with the clinical basis), the CPT(s) and units authorization is sought for, and the requested date/service span. Add: "The rendering provider is available for a peer-to-peer discussion; contact via the return number above."
+
+---PAGEBREAK---
+
+## Attestation & Signature
+A provider attestation: "I attest that the information in this prior authorization request is accurate and complete to the best of my knowledge, that the requested service(s) are medically necessary for the treatment of this patient, and that the supporting clinical documentation is contained in the patient's medical record." Then a signature block:
+- **Provider Signature:** ______________________________
+- **Printed Name / Credentials:** <rendering provider>
+- **NPI:** <rendering NPI>
+- **Date:** <submissionDate>
 
 Rules:
-- Use ONLY the provided data. Never invent clinical facts, numbers, or identifiers. Empty fields → "Not provided".
-- Do NOT use Markdown tables anywhere — use bulleted key/value lines instead (they must render in a simple Markdown viewer).
-- If an "overrideReason" is present (submitted below the readiness threshold), add a clearly labeled "## Submission Note" section stating it was submitted with documented justification, and include the reason text.
-- Professional, formatted, submission-ready.`
+- LENGTH: The complete package MUST be a MINIMUM of 4000 words. Reach this length by fully developing every clinical section with case-specific depth — expand the medical-necessity narrative, the per-criterion policy analysis, the crosswalk rationale, and the objective findings. Do NOT pad with repetition, filler, or generic statements, and never fabricate facts to add length; be exhaustive using the provided record.
+- Be comprehensive. Every section above is REQUIRED and must contain real, case-specific content — do not omit, collapse, or shortcut sections. A complete packet runs 5-8 pages.
+- Use ONLY the provided data. Never invent clinical facts, numbers, identifiers, or contact details. Empty fields → "Not provided".
+- Do NOT use Markdown tables anywhere — use bulleted key/value lines only (they must render in a simple Markdown viewer).
+- If an "overrideReason" is present (submitted below the readiness threshold), add a clearly labeled "## Submission Note" section at the end of the clinical packet stating it was submitted with documented provider justification, and quote the reason text.
+- Tone: formal, precise, submission-ready. No marketing language, no hedging, no placeholders other than the signature line.`
 
     const openaiRes = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -831,8 +921,8 @@ Rules:
       body: JSON.stringify({
         model: 'gpt-4.1',
         temperature: 0.2,
-        max_tokens: 4096,
-        response_format: { type: 'json_object' },
+        // Generous ceiling so a full 3-5 page packet is never truncated mid-section.
+        max_tokens: 16000,
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: JSON.stringify(body) },
@@ -844,11 +934,34 @@ Rules:
       return { status: 502, json: { error: `OpenAI API error: ${await openaiRes.text()}` } }
     }
 
-    const data = (await openaiRes.json()) as { choices: { message: { content: string } }[] }
-    const parsed = JSON.parse(data.choices?.[0]?.message?.content ?? '{}') as Record<string, unknown>
-    const document = typeof parsed.document === 'string' ? parsed.document.trim() : ''
-    if (!document) {
-      return { status: 502, json: { error: 'The model did not return a package.' } }
+    const data = (await openaiRes.json()) as {
+      choices: { message: { content: string }; finish_reason?: string }[]
+    }
+    const choice = data.choices?.[0]
+    let document = (choice?.message?.content ?? '').trim()
+
+    // The model is asked for raw Markdown, but harden against it wrapping the
+    // output in a ```fence``` or a legacy { "document": "..." } JSON envelope.
+    if (document.startsWith('```')) {
+      document = document.replace(/^```(?:markdown|md)?\s*\n?/i, '').replace(/\n?```\s*$/i, '').trim()
+    }
+    if (document.startsWith('{')) {
+      try {
+        const envelope = JSON.parse(document) as Record<string, unknown>
+        if (typeof envelope.document === 'string') document = envelope.document.trim()
+      } catch {
+        // Not valid JSON — fall through and use the raw text as-is.
+      }
+    }
+
+    if (!document || document.length < 40) {
+      return { status: 502, json: { error: 'The model did not return a usable package.' } }
+    }
+    // Truncation guard: if the response hit the token ceiling, the attestation
+    // page may be cut off — append a clear notice so it is never silently short.
+    if (choice?.finish_reason === 'length') {
+      document +=
+        '\n\n---PAGEBREAK---\n\n## Notice\nThis package reached the generation length limit and may be incomplete. Regenerate or review the final sections before submission.'
     }
     return cacheAndSend(cacheKey, { document })
   } catch (err) {
@@ -1900,7 +2013,7 @@ async function handleArSmartFilter(body: Record<string, unknown>, apiKey: string
     const cached = serveFromCache(cacheKey)
     if (cached) return cached
 
-    const systemPrompt = `You convert a natural-language request into a strict JSON filter for an accounts-receivable / denial-management claims worklist.
+    const systemPrompt = `You convert a natural-language request into a strict JSON filter for an accounts-receivable / denial-management claims worklist. Parse ANY phrasing accurately — questions, commands, shorthand, or casual language.
 Return ONLY JSON of this EXACT shape:
 {
   "status": one of "paid" | "in-process" | "pending-verification" | "appeal" | "resubmitted" | "manual" | "all",
@@ -1909,8 +2022,22 @@ Return ONLY JSON of this EXACT shape:
   "claimId": string or null,
   "keywords": string[]
 }
-Map phrasing to status: "paid"/"closed"/"posted"→paid; "in process"/"in adjudication"/"pending payer"→in-process; "pending verification"/"needs status check"/"unverified"→pending-verification; "appeal"/"needs appeal"/"appealable denial"→appeal; "resubmit"/"resubmitted"/"corrected claim"→resubmitted; "manual"/"denied"/"hard denial"/"manual intervention"/"write-off"→manual. Use "all" when no status is implied.
-Extract a payer/insurance name, a patient name, and a claim id (as written) if present. keywords = lowercase salient terms not already captured (denial codes like "co-197", CARC/RARC fragments, procedure or aging terms). Respond with ONLY the JSON object.`
+
+STATUS — map intent to exactly one bucket, else "all":
+- paid: "paid", "closed", "posted", "collected", "reimbursed", "remitted".
+- in-process: "in process", "in adjudication", "pending with payer", "awaiting payment", "processing".
+- pending-verification: "pending verification", "needs a status check", "unverified", "status unknown", "no response yet".
+- appeal: "appeal", "needs appeal", "appealable", "overturn", "medical necessity denial", "auth denial that can be appealed".
+- resubmitted: "resubmit", "resubmitted", "corrected claim", "rebill", "fix and refile", "coding correction".
+- manual: "manual intervention", "hard denial", "true denial", "non-appealable", "write-off". Plain "denied"/"denials"/"rejected" with NO other cue → manual.
+If the request names both a denial AND an action (e.g. "denials to appeal"), pick the action's bucket (appeal).
+
+PAYER — resolve to one of these canonical names when the request implies it (match aliases): "Medicare" (cms), "Medicaid", "Aetna" (cvs), "UnitedHealthcare" (uhc, united, optum), "Cigna" (evernorth), "Blue Cross Blue Shield" (bcbs, blue cross, anthem, blue shield), "Humana". Return the canonical name. null if no payer is implied.
+
+Also extract a patient name and a claim id (e.g. "CLM-2026-100123") as written, if present.
+
+KEYWORDS — lowercase salient content terms NOT already captured by status/payer/patient/claimId, chosen so they LITERALLY appear in claim data: denial codes ("co-197", "pr-1", "co-45"), CARC/RARC fragments, procedure/CPT words ("mri", "colonoscopy", "infusion"), or diagnosis words. Do NOT put status words, intent words ("denied", "appeal", "paid"), payer names, or aging/dollar phrases ("over 90 days", "high dollar") into keywords — those don't appear verbatim in the data and would zero out results. Use [] when unsure.
+Respond with ONLY the JSON object.`
 
     const openaiRes = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -1919,6 +2046,82 @@ Extract a payer/insurance name, a patient name, and a claim id (as written) if p
         model: 'gpt-4o-mini',
         temperature: 0,
         max_tokens: 300,
+        response_format: { type: 'json_object' },
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: query },
+        ],
+      }),
+    })
+
+    if (!openaiRes.ok) {
+      return { status: 502, json: { error: `OpenAI API error: ${await openaiRes.text()}` } }
+    }
+
+    const data = (await openaiRes.json()) as { choices: { message: { content: string } }[] }
+    const parsed = JSON.parse(data.choices?.[0]?.message?.content ?? '{}')
+    return cacheAndSend(cacheKey, parsed)
+  } catch (err) {
+    return { status: 500, json: { error: err instanceof Error ? err.message : 'Unknown server error' } }
+  }
+}
+
+/* ============================================================================
+ * Route: era-smart-filter — gpt-4o-mini ERA/EOB posting worklist filter parser.
+ * ==========================================================================*/
+async function handleEraSmartFilter(body: Record<string, unknown>, apiKey: string): Promise<RouteResult> {
+  try {
+    if (!apiKey) {
+      return { status: 500, json: { error: 'OPENAI_API_KEY is not configured on the server.' } }
+    }
+
+    const query = body.query
+    if (typeof query !== 'string' || !query.trim()) {
+      return { status: 400, json: { error: 'A natural language "query" string is required.' } }
+    }
+
+    const cacheKey = cacheKeyFor('era-smart-filter', { query: query.trim().toLowerCase() })
+    const cached = serveFromCache(cacheKey)
+    if (cached) return cached
+
+    const systemPrompt = `You convert a natural-language request into a strict JSON filter for an ERA (electronic remittance advice) / EOB posting worklist. Parse ANY phrasing accurately — questions, commands, shorthand, or casual language.
+Return ONLY JSON of this EXACT shape:
+{
+  "status": one of "yet-to-post" | "batched" | "in-process" | "posted" | "all",
+  "payerName": string or null,
+  "patientName": string or null,
+  "claimId": string or null,
+  "batchId": string or null,
+  "mode": one of "Check" | "EFT" | "VCC" or null,
+  "cpt": string or null,
+  "minPaidDollars": number or null,
+  "keywords": string[]
+}
+
+STATUS — map the POSTING lifecycle, else "all":
+- yet-to-post: "yet to post", "not posted", "unposted", "pending posting", "not batched", "awaiting batch".
+- batched: "batch created", "batched", "queued for posting", "ready to post", "created for posting".
+- in-process: "in process", "posting in progress", "currently posting", "being posted".
+- posted: "posted", "posting completed", "completed", "finished posting", "done".
+
+PAYER — resolve to a canonical name when implied (match aliases): "Medicare", "Medicaid", "Aetna", "UnitedHealthcare" (uhc, united, optum), "Cigna", "Blue Cross Blue Shield" (bcbs, blue cross, anthem→"Anthem"), "Humana", "Kaiser Permanente" (kaiser, kp), "Ambetter (Centene)" (ambetter, centene). Return the canonical name, else null.
+
+MODE — payment method: "check"→Check, "eft"/"ach"/"electronic"→EFT, "vcc"/"virtual card"/"virtual credit card"→VCC. Else null.
+
+CPT / CPT-LEVEL PAYMENTS — if the request references a specific CPT/procedure code (e.g. "99213", "MRI 70553", "colonoscopy 45378"), set "cpt" to just the 5-digit code. If the request specifies a payment threshold (e.g. "CPT 96413 paid over $500", "claims paid more than 1000"), set "minPaidDollars" to the dollar number (no $ or commas). Combine both when both are present.
+
+Also extract patientName, claimId (e.g. "CLM-2026-600123"), and batchId (e.g. "BATCH-2026-4012") as written, if present.
+
+KEYWORDS — lowercase salient content terms NOT already captured, chosen so they LITERALLY appear in ERA data: a payment number fragment, an adjustment code ("co-45", "pr-2"), an RARC ("n130"), or a procedure word. Do NOT put status/intent words, payer names, mode words, dollar phrases, or CPT codes already captured above into keywords. Use [] when unsure.
+Respond with ONLY the JSON object.`
+
+    const openaiRes = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        temperature: 0,
+        max_tokens: 320,
         response_format: { type: 'json_object' },
         messages: [
           { role: 'system', content: systemPrompt },
@@ -2030,21 +2233,22 @@ async function handleArNote(body: Record<string, unknown>, apiKey: string): Prom
     const cached = serveFromCache(cacheKey)
     if (cached) return cached
 
-    const systemPrompt = `You are a senior accounts-receivable and denial-management specialist. Write ONE enterprise-grade AR work note for a single claim, ready to paste into a practice management system (PMS) or forward to the provider.
+    const systemPrompt = `You are a senior accounts-receivable and denial-management specialist. Write ONE enterprise-grade AR work note for a single claim, ready to paste into a practice management system (PMS) or forward to the provider. The note must be thorough, precise, and audit-ready.
 
 STRICT RULES:
-- Use ONLY the facts provided in the user message. Copy every amount, date, code, and identifier VERBATIM. Never invent or estimate numbers, dates, CARC/RARC codes, or payer policies.
-- Write in a precise, professional AR-specialist voice. Be complete but concise.
-- Follow the template EXACTLY, keeping the section headers. Omit an entire section only when its facts are not provided (e.g. omit DENIAL DETAIL and ROOT-CAUSE ANALYSIS for paid / in-process / pending-verification claims).
-- Tailor the STATUS & ADJUDICATION, ROOT-CAUSE, and ACTION PLAN content to the claim's status:
-  paid → confirm adjudication, payment posting (remit method + trace #), and account closure.
-  in-process → submission, clearinghouse acceptance, current adjudication status, next automated status check.
-  pending-verification → acknowledgment received, status/eligibility verification action, due date.
-  appeal → denial detail, appealability, appeal packet + submission channel, filing deadline.
+- Use ONLY the facts provided in the user message. Copy every amount, date, code, and identifier VERBATIM. Never invent or estimate numbers, dates, CARC/RARC codes, payer policies, claim numbers, or trace IDs.
+- Write in a precise, professional AR-specialist voice. Be detailed and complete — this is a formal work note, not a summary.
+- Follow the template EXACTLY, keeping the section headers in ALL CAPS on their own line. Omit an entire section only when its facts are not provided (e.g. omit DENIAL DETAIL and ROOT-CAUSE ANALYSIS for paid / in-process / pending-verification claims).
+- Every bullet is "• Label: value". Keep the labels exactly as shown so they render as a structured record.
+- Tailor STATUS & ADJUDICATION, ROOT-CAUSE, and ACTION PLAN to the claim's status:
+  paid → confirm adjudication, payment posting (remit method + trace #), patient-responsibility breakdown, and account closure.
+  in-process → submission, clearinghouse acceptance, current adjudication status, expected timeframe, next automated status check.
+  pending-verification → acknowledgment received, status/eligibility verification action, verification due date.
+  appeal → denial detail, appealability rationale, appeal packet contents + submission channel, filing deadline, dollars at risk.
   resubmitted → denial detail, root cause, correction applied, corrected-claim resubmission + new claim #, follow-up date.
-  manual → hard-denial detail, analysis, required manual/escalation action, decision-due date.
+  manual → hard-denial detail, root-cause analysis, required manual/escalation action, decision-due date, dollars at risk.
 
-TEMPLATE (plain text; use "•" bullets and numbered steps exactly as shown):
+TEMPLATE (plain text; use "•" bullets and numbered steps exactly as shown; keep the section headers verbatim and in ALL CAPS):
 ACCOUNTS RECEIVABLE WORK NOTE — {statusLabel}
 Claim {id}  ·  Payer Claim #{payerClaimId}
 Patient: {patient} ({patientId})  |  Payer: {payer}
@@ -2057,26 +2261,37 @@ FINANCIAL SUMMARY
 • Insurance Paid: {paid}
 • Contractual Adjustment: {adjustment}
 • Patient Responsibility: {patientResponsibility}
+• Coinsurance: {coinsurance}
+• Deductible: {deductible}
 • Outstanding Balance: {outstanding}
 
+PAYER & CLAIM REFERENCE
+• Payer Claim #: {payerClaimId}
+• Corrected Claim #: {correctedClaimId}   (include ONLY for resubmitted claims)
+• Remittance Trace / {remit} #: {traceId}   (include ONLY for paid claims)
+
 STATUS & ADJUDICATION
-<2–4 sentences grounded in the facts and dates>
+<3–5 detailed sentences grounded in the facts and dates — narrate exactly what happened and where the claim stands>
 
 DENIAL DETAIL
 • CARC {carc}: {carcDesc}
 • RARC {rarc}: {rarcDesc}   (include this line ONLY if an RARC is provided)
 • Classification: {classification}
+• Denial Posted: {denialDate}
 
 ROOT-CAUSE ANALYSIS
-<1–3 sentences using the provided rationale>
+<2–3 sentences using the provided rationale — explain WHY the claim denied and whether it is recoverable>
 
 ACTION PLAN / NEXT STEPS
 1. <concrete step from the recommended action>
 2. <concrete step>
-3. <concrete step if warranted>
+3. <concrete step>
+4. <concrete step if warranted>
 
 FOLLOW-UP
-• Owner: {owner}   • Channel: {channel}   • Target Date: {target}
+• Owner: {owner}
+• Channel: {channel}
+• Target Date: {target}
 
 Return ONLY JSON of the exact shape: { "note": "<the full note text, with real newline characters>" }`
 
@@ -2088,7 +2303,7 @@ Return ONLY JSON of the exact shape: { "note": "<the full note text, with real n
       body: JSON.stringify({
         model: 'gpt-4.1',
         temperature: 0.2,
-        max_tokens: 1100,
+        max_tokens: 2000,
         response_format: { type: 'json_object' },
         messages: [
           { role: 'system', content: systemPrompt },
@@ -2272,6 +2487,7 @@ const ROUTE_HANDLERS: Record<string, RouteHandler> = {
   'ar-note': handleArNote,
   'appeal-letter': handleAppealLetter,
   'appeals-filter': handleAppealsFilter,
+  'era-smart-filter': handleEraSmartFilter,
 }
 
 /** Route names accepted (the path segment after "/api/"). */

@@ -41,7 +41,10 @@ function renderMarkdown(md: string): ReactNode[] {
   }
   for (const raw of md.split('\n')) {
     const line = raw.trimEnd()
-    if (/^###\s+/.test(line)) {
+    if (/^-{2,}\s*PAGEBREAK\s*-{2,}$/i.test(line.trim())) {
+      flush()
+      out.push(<hr key={key++} className="fin-doc-pagebreak" aria-label="Page break" />)
+    } else if (/^###\s+/.test(line)) {
       flush()
       out.push(<h4 key={key++} className="fin-doc-h4">{inline(line.replace(/^###\s+/, ''))}</h4>)
     } else if (/^##\s+/.test(line)) {
@@ -71,6 +74,7 @@ function FinalStep({ value, onChange, patientPayer, facilityProvider, codes, med
   const [valError, setValError] = useState('')
   const [pkgStatus, setPkgStatus] = useState<Status>(value.packageDocument ? 'done' : 'idle')
   const [pkgError, setPkgError] = useState('')
+  const [pkgStep, setPkgStep] = useState(0)
   const [showModal, setShowModal] = useState(false)
   const [reason, setReason] = useState('')
 
@@ -80,6 +84,15 @@ function FinalStep({ value, onChange, patientPayer, facilityProvider, codes, med
   const cptCount = codes.cptCodes.filter((c) => c.code.trim()).length
   const dxCount = codes.icdCodes.filter((c) => c.code.trim()).length
   const canValidate = Boolean(payerName) && (cptCount > 0 || dxCount > 0)
+
+  // Staged, cosmetic progression shown while the PA package compiles.
+  const PKG_PROCESS = [
+    'Assembling patient, payer & clinical data',
+    'Building HIPAA fax cover sheet',
+    'Compiling diagnosis → procedure crosswalk',
+    `Mapping ${payerName || 'payer'} medical-policy criteria`,
+    'Formatting submission-ready packet',
+  ]
 
   const valueRef = useRef(value)
   valueRef.current = value
@@ -148,6 +161,22 @@ function FinalStep({ value, onChange, patientPayer, facilityProvider, codes, med
     if (v.score >= THRESHOLD) runPackageRef.current('')
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value.validation, value.validatedFor, value.packageFor, signature])
+
+  // Cosmetic progression of the package-compile steps while loading.
+  useEffect(() => {
+    if (pkgStatus !== 'loading') return
+    setPkgStep(0)
+    const id = window.setInterval(() => setPkgStep((s) => Math.min(s + 1, PKG_PROCESS.length - 1)), 1200)
+    return () => window.clearInterval(id)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pkgStatus])
+
+  const pkgProcState = (i: number): 'done' | 'active' | 'pending' =>
+    pkgStatus === 'done' || (pkgStatus === 'loading' && i < pkgStep)
+      ? 'done'
+      : pkgStatus === 'loading' && i === pkgStep
+        ? 'active'
+        : 'pending'
 
   const validation = value.validation
   const score = validation?.score ?? 0
@@ -377,11 +406,54 @@ function FinalStep({ value, onChange, patientPayer, facilityProvider, codes, med
                 <article className="fin-doc-paper">{renderMarkdown(value.packageDocument)}</article>
               </div>
             </>
+          ) : pkgStatus === 'loading' ? (
+            <div className="fin-pkg-loader">
+              <div className="fin-pkg-loader-head">
+                <span className="fin-pkg-loader-spinner" aria-hidden="true" />
+                <div>
+                  <h3 className="fin-pkg-loader-title">Compiling the PA package</h3>
+                  <p className="fin-pkg-loader-sub">
+                    Assembling a submission-ready, {payerName ? <strong>{payerName}</strong> : 'payer'}-specific packet…
+                  </p>
+                </div>
+              </div>
+
+              <div className="fin-pkg-process">
+                {PKG_PROCESS.map((label, i) => {
+                  const st = pkgProcState(i)
+                  return (
+                    <div key={i} className={`fin-pkg-step is-${st}`}>
+                      <span className="fin-pkg-step-dot">
+                        {st === 'done' ? (
+                          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" aria-hidden="true">
+                            <path d="M5 12.5l4 4 10-10" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                        ) : st === 'active' ? (
+                          <span className="fin-pkg-step-pulse" aria-hidden="true" />
+                        ) : (
+                          i + 1
+                        )}
+                      </span>
+                      <span className="fin-pkg-step-label">{label}</span>
+                    </div>
+                  )
+                })}
+              </div>
+
+              <div className="proc-bar" aria-hidden="true" />
+
+              <div className="fin-pkg-skeleton" aria-hidden="true">
+                <span className="fin-sk-line w-70" />
+                <span className="fin-sk-line w-90" />
+                <span className="fin-sk-line w-100" />
+                <span className="fin-sk-line w-80" />
+                <span className="fin-sk-line w-95" />
+                <span className="fin-sk-line w-60" />
+              </div>
+            </div>
           ) : (
             <div className="fin-empty">
-              {pkgStatus === 'loading'
-                ? 'Compiling the payer-specific PA package…'
-                : 'The PA package appears here once readiness reaches 90% (auto) or you generate it from the Validation tab.'}
+              The PA package appears here once readiness reaches 90% (auto) or you generate it from the Validation tab.
             </div>
           )}
         </div>

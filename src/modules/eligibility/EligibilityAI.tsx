@@ -38,15 +38,15 @@ function EligibilityAI() {
 
   const [detailPatient, setDetailPatient] = useState<Patient | null>(null)
 
-  useEffect(() => {
-    fetchSummary().then(setSummary)
-  }, [])
-
+  // Summary counts and the worklist are fetched together from the SAME query so
+  // the cards, smart filter, and table are always scope-consistent — each status
+  // card's number equals the rows you get when you click it.
   useEffect(() => {
     let cancelled = false
     setIsLoadingPatients(true)
-    fetchPatients(query).then((results) => {
+    Promise.all([fetchSummary(query), fetchPatients(query)]).then(([nextSummary, results]) => {
       if (!cancelled) {
+        setSummary(nextSummary)
         setPatients(results)
         setIsLoadingPatients(false)
       }
@@ -91,7 +91,7 @@ function EligibilityAI() {
   // Manual-review correction re-run: transition to Active and refresh counts/list.
   const handleResolveManualReview = async (patientId: string): Promise<Patient | undefined> => {
     const updated = await resolveManualReview(patientId)
-    const [nextSummary, nextPatients] = await Promise.all([fetchSummary(), fetchPatients(query)])
+    const [nextSummary, nextPatients] = await Promise.all([fetchSummary(query), fetchPatients(query)])
     setSummary(nextSummary)
     setPatients(nextPatients)
     if (updated) setDetailPatient(updated)
@@ -127,7 +127,7 @@ function EligibilityAI() {
 
     // The patient's status has now transitioned to Active or Inactive, so
     // refresh both the summary counts and the worklist to keep everything in sync.
-    const [nextSummary, nextPatients] = await Promise.all([fetchSummary(), fetchPatients(query)])
+    const [nextSummary, nextPatients] = await Promise.all([fetchSummary(query), fetchPatients(query)])
     setSummary(nextSummary)
     setPatients(nextPatients)
   }

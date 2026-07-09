@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState, type ReactElement } from 'react'
-import { AR_CLAIMS, AR_SUMMARY } from './engine/claimsEngine'
+import { AR_CLAIMS, summarize } from './engine/claimsEngine'
 import { fmtUSD, fmtUSDWhole } from './engine/money'
 import { AR_STATUS_LABEL, type ArClaim, type ArStatus } from './types'
 import { parseArFilter } from './api/arSmartFilterApi'
-import { applyArFilter, type ArFilter } from './api/arFilter'
+import { matchesArScope, type ArFilter } from './api/arFilter'
 import { generateArNote } from './api/arNoteApi'
 import '../eligibility/components/SmartFilterBar.css'
 import './ARDashboard.css'
@@ -88,9 +88,124 @@ const statusBadgeClass: Record<ArStatus, string> = {
   manual: 'ar-b-manual',
 }
 
+/* ---------- AR note rich formatter ----------
+ * The generated note is copy-ready plain text (PMS-friendly). For DISPLAY we
+ * parse its ALL-CAPS section headers, "• Label: value" bullets, and numbered
+ * steps into an enterprise-grade, bolded layout without altering the copy text. */
+const SECTION_ICON: Record<string, string> = {
+  FINANCIAL: '$',
+  'PAYER & CLAIM REFERENCE': '#',
+  'STATUS & ADJUDICATION': '◆',
+  'DENIAL DETAIL': '!',
+  'ROOT-CAUSE ANALYSIS': '◎',
+  'ACTION PLAN / NEXT STEPS': '→',
+  'FOLLOW-UP': '⏱',
+}
+const HEADING_RE = /^[A-Z][A-Z0-9 &/,'()\-]{3,}$/
+const iconFor = (heading: string): string => {
+  const key = Object.keys(SECTION_ICON).find((k) => heading.toUpperCase().includes(k.split(' ')[0]))
+  return key ? SECTION_ICON[key] : '•'
+}
+
+interface NoteBlock {
+  heading: string | null
+  lines: string[]
+}
+
+function parseNote(text: string): NoteBlock[] {
+  const blocks: NoteBlock[] = []
+  let current: NoteBlock = { heading: null, lines: [] }
+  for (const raw of text.split('\n')) {
+    const line = raw.trimEnd()
+    if (HEADING_RE.test(line.trim()) && !line.trim().startsWith('•')) {
+      if (current.heading !== null || current.lines.length) blocks.push(current)
+      current = { heading: line.trim(), lines: [] }
+    } else {
+      current.lines.push(line)
+    }
+  }
+  if (current.heading !== null || current.lines.length) blocks.push(current)
+  return blocks
+}
+
+function renderBullet(line: string, key: number): ReactElement {
+  const body = line.replace(/^•\s*/, '')
+  const idx = body.indexOf(':')
+  if (idx > 0 && idx < 40) {
+    const label = body.slice(0, idx).trim()
+    const value = body.slice(idx + 1).trim()
+    return (
+      <div className="ar-note-kv" key={key}>
+        <span className="ar-note-kv-label">{label}</span>
+        <span className="ar-note-kv-value">{value}</span>
+      </div>
+    )
+  }
+  return (
+    <div className="ar-note-bullet" key={key}>
+      {body}
+    </div>
+  )
+}
+
+function ARNoteDoc({ text }: { text: string }): ReactElement {
+  const blocks = parseNote(text)
+  return (
+    <div className="ar-note-doc">
+      {blocks.map((block, bi) => {
+        // Header block (title + meta lines, no ALL-CAPS heading).
+        if (block.heading === null) {
+          const [title, ...meta] = block.lines.filter((l) => l.trim())
+          return (
+            <div className="ar-note-headerblock" key={bi}>
+              {title && <div className="ar-note-doc-title">{title}</div>}
+              {meta.map((m, i) => (
+                <div className="ar-note-doc-metaline" key={i}>
+                  {m}
+                </div>
+              ))}
+            </div>
+          )
+        }
+        const isFinancial = /FINANCIAL/i.test(block.heading)
+        const content = block.lines.filter((l) => l.trim())
+        return (
+          <section className={`ar-note-section${isFinancial ? ' is-financial' : ''}`} key={bi}>
+            <h4 className="ar-note-section-title">
+              <span className="ar-note-section-icon" aria-hidden="true">
+                {iconFor(block.heading)}
+              </span>
+              {block.heading}
+            </h4>
+            <div className={isFinancial ? 'ar-note-fin-grid' : 'ar-note-body'}>
+              {content.map((line, li) => {
+                const t = line.trim()
+                if (t.startsWith('•')) return renderBullet(t, li)
+                const numbered = t.match(/^(\d+)\.\s+(.*)$/)
+                if (numbered) {
+                  return (
+                    <div className="ar-note-step" key={li}>
+                      <span className="ar-note-step-num">{numbered[1]}</span>
+                      <span className="ar-note-step-text">{numbered[2]}</span>
+                    </div>
+                  )
+                }
+                return (
+                  <p className="ar-note-para" key={li}>
+                    {t}
+                  </p>
+                )
+              })}
+            </div>
+          </section>
+        )
+      })}
+    </div>
+  )
+}
+
 function ARDashboard() {
   const rows = AR_CLAIMS
-  const summary = AR_SUMMARY
 
   const [cardStatus, setCardStatus] = useState<CardKey>('all')
   const [page, setPage] = useState(1)
@@ -112,6 +227,14 @@ function ARDashboard() {
   const [filterErr, setFilterErr] = useState('')
   const filterCtrl = useRef<AbortController | null>(null)
 
+  // Rows matching the smart filter's NON-status criteria (payer/patient/id/keywords)
+  // — the scope the summary cards and table are both drawn from.
+  const scopedRows = useMemo(() => rows.filter((r) => matchesArScope(r, filter)), [rows, filter])
+
+  // Summary counts + totals recomputed WITHIN the active scope, so every card's
+  // number equals the rows you get when you click it under the current filter.
+  const summary = useMemo(() => summarize(scopedRows), [scopedRows])
+
   const cards: CardDef[] = [
     { key: 'all', label: 'Total Claims Received', sub: `${fmtUSDWhole(summary.totalBilledCents)} billed · ${summary.payerCount} payers`, tone: 'blue', Icon: IInbox },
     { key: 'pending-verification', label: 'Pending Status Verification', tone: 'violet', Icon: ISearch },
@@ -124,10 +247,10 @@ function ARDashboard() {
 
   const cardValue = (key: CardKey): number => (key === 'all' ? summary.total : summary.byStatus[key])
 
-  const filtered = useMemo(() => {
-    const base = cardStatus === 'all' ? rows : rows.filter((r) => r.status === cardStatus)
-    return applyArFilter(base, filter)
-  }, [rows, cardStatus, filter])
+  const filtered = useMemo(
+    () => (cardStatus === 'all' ? scopedRows : scopedRows.filter((r) => r.status === cardStatus)),
+    [scopedRows, cardStatus],
+  )
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
   const clampedPage = Math.min(page, totalPages)
@@ -156,6 +279,9 @@ function ARDashboard() {
       .then((f) => {
         setFilter(f)
         setAppliedLabel(q)
+        // The smart filter defines the status view too — highlight the matching
+        // card (or "all") so the cards, filter, and table stay in lockstep.
+        setCardStatus(f.status)
         setPage(1)
       })
       .catch((err: unknown) => {
@@ -164,12 +290,33 @@ function ARDashboard() {
       })
       .finally(() => setFilterBusy(false))
   }
+  const runFilterRef = useRef(runFilter)
+  runFilterRef.current = runFilter
+
+  // Real-time parsing: debounce the query so the filter resolves as the user
+  // types (not only on submit), while the explicit "Ask AI" button still works.
+  useEffect(() => {
+    const q = query.trim()
+    if (!q) {
+      if (filter) {
+        setFilter(null)
+        setAppliedLabel('')
+        setFilterErr('')
+      }
+      return
+    }
+    if (q === appliedLabel || q.length < 3) return
+    const timer = window.setTimeout(() => runFilterRef.current(), 600)
+    return () => window.clearTimeout(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query, appliedLabel])
 
   const clearFilter = () => {
     setQuery('')
     setFilter(null)
     setAppliedLabel('')
     setFilterErr('')
+    setCardStatus('all')
   }
 
   // Generate the full enterprise AR note in real time when a claim is opened.
@@ -300,7 +447,11 @@ function ARDashboard() {
       <div className="ar-table-heading">
         <span className="ar-table-label">Accounts Receivable Worklist</span>
         <span className="ar-results-meta">
-          Showing <strong>{filtered.length.toLocaleString('en-US')}</strong> of <strong>{rows.length.toLocaleString('en-US')}</strong> claims
+          Showing <strong>{filtered.length.toLocaleString('en-US')}</strong> of{' '}
+          <strong>{scopedRows.length.toLocaleString('en-US')}</strong> claims
+          {filter && scopedRows.length !== rows.length && (
+            <span className="ar-results-scope"> · filtered from {rows.length.toLocaleString('en-US')}</span>
+          )}
         </span>
       </div>
 
@@ -380,30 +531,43 @@ function ARDashboard() {
       {noteClaim && (
         <div className="ar-modal-overlay" role="dialog" aria-modal="true" aria-label="AR note" onClick={() => setNoteClaim(null)}>
           <div className="ar-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="ar-modal-head">
-              <div className="ar-modal-titles">
-                <span className="ar-modal-title">AR Note — {noteClaim.id}</span>
+            <div className={`ar-modal-head tone-${statusBadgeClass[noteClaim.status]}`}>
+              <div className="ar-modal-head-main">
+                <div className="ar-modal-eyebrow">
+                  <span className="ar-modal-eyebrow-dot" aria-hidden="true" />
+                  Accounts Receivable Work Note
+                </div>
+                <div className="ar-modal-titles">
+                  <span className="ar-modal-title">Claim {noteClaim.id}</span>
+                  <span className={`ar-badge ${statusBadgeClass[noteClaim.status]}`}>{AR_STATUS_LABEL[noteClaim.status]}</span>
+                </div>
                 <span className="ar-modal-sub">
-                  {noteClaim.patientName} · {noteClaim.payerName} · DOS {noteClaim.dos}
+                  {noteClaim.patientName} · {noteClaim.patientId} &nbsp;|&nbsp; {noteClaim.payerName} · DOS {noteClaim.dos} · Aging {noteClaim.agingDays}d
                 </span>
               </div>
-              <span className={`ar-badge ${statusBadgeClass[noteClaim.status]}`}>{AR_STATUS_LABEL[noteClaim.status]}</span>
               <button type="button" className="ar-modal-close" onClick={() => setNoteClaim(null)} aria-label="Close">
                 ×
               </button>
             </div>
-            {noteLoading ? (
-              <div className="ar-note-loading">
-                <span className="ar-note-spinner" aria-hidden="true" />
-                <span>Generating enterprise AR note in real time…</span>
-              </div>
-            ) : noteError ? (
-              <div className="ar-note-error">{noteError}</div>
-            ) : (
-              <pre className="ar-note-full">{noteText}</pre>
-            )}
+
+            <div className="ar-modal-scroll">
+              {noteLoading ? (
+                <div className="ar-note-loading">
+                  <span className="ar-note-spinner" aria-hidden="true" />
+                  <div>
+                    <div className="ar-note-loading-title">Generating enterprise AR note</div>
+                    <div className="ar-note-loading-sub">Compiling adjudication, financials & action plan in real time…</div>
+                  </div>
+                </div>
+              ) : noteError ? (
+                <div className="ar-note-error">{noteError}</div>
+              ) : (
+                <ARNoteDoc text={noteText} />
+              )}
+            </div>
+
             <div className="ar-modal-foot">
-              <span className="ar-modal-hint">AI-generated · copy-ready for the practice management system or provider hand-off.</span>
+              <span className="ar-modal-hint">Copy-ready for the practice management system or provider hand-off.</span>
               <button
                 type="button"
                 className={`ar-copy-btn${copied ? ' is-copied' : ''}`}

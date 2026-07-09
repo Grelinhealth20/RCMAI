@@ -147,6 +147,10 @@
 .ar-results-meta strong {
   color: var(--navy);
 }
+.ar-results-scope {
+  color: var(--text-muted);
+  opacity: 0.85;
+}
 
 .ar-table-wrap {
   overflow-x: auto;
@@ -322,92 +326,296 @@
 }
 
 .ar-modal {
-  width: 640px;
+  /* Widened 25% (640px → 800px) for the enterprise note layout. */
+  width: 800px;
   max-width: 100%;
-  max-height: 88vh;
+  max-height: 90vh;
   display: flex;
   flex-direction: column;
   background: var(--white);
   border: 1px solid var(--border-strong);
-  border-radius: 16px;
-  box-shadow: 0 24px 60px rgba(9, 17, 33, 0.32);
+  border-radius: 18px;
+  box-shadow: 0 28px 70px rgba(9, 17, 33, 0.38);
   overflow: hidden;
 }
 
+/* ---------- Redesigned header ---------- */
 .ar-modal-head {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 18px 20px 16px;
+  background: linear-gradient(135deg, #0d1b3a 0%, #14284f 55%, #1c3a6e 100%);
+  color: var(--white);
+}
+.ar-modal-head::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 5px;
+  background: var(--blue-accent, #3d6fe0);
+}
+.ar-modal-head.tone-ar-b-paid::before { background: #33c27a; }
+.ar-modal-head.tone-ar-b-appeal::before { background: #f4a52b; }
+.ar-modal-head.tone-ar-b-manual::before { background: #ef5a5a; }
+.ar-modal-head.tone-ar-b-resubmit::before { background: #2bc4c4; }
+.ar-modal-head.tone-ar-b-process::before { background: #4d9bf0; }
+.ar-modal-head.tone-ar-b-pending::before { background: #9b7ff0; }
+
+.ar-modal-head-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.ar-modal-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.9px;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.72);
+}
+.ar-modal-eyebrow-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #4ade80;
+  box-shadow: 0 0 0 3px rgba(74, 222, 128, 0.22);
+}
+.ar-modal-titles {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 16px 18px;
-  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
 }
-
-.ar-modal-titles {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  flex: 1;
-  min-width: 0;
-}
-
 .ar-modal-title {
-  font-size: 14px;
+  font-size: 19px;
   font-weight: 800;
-  color: var(--navy);
+  letter-spacing: 0.2px;
+  color: var(--white);
+  font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
 }
-
 .ar-modal-sub {
-  font-size: 11.5px;
+  font-size: 12px;
   font-weight: 600;
-  color: var(--text-muted);
+  color: rgba(255, 255, 255, 0.82);
 }
 
 .ar-modal-close {
   flex-shrink: 0;
-  width: 28px;
-  height: 28px;
+  width: 30px;
+  height: 30px;
   border: none;
-  border-radius: 8px;
-  background: var(--surface-tint-strong);
-  color: var(--navy);
-  font-size: 18px;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.14);
+  color: var(--white);
+  font-size: 19px;
   line-height: 1;
   cursor: pointer;
+  transition: background 0.15s ease;
 }
 .ar-modal-close:hover {
-  background: var(--navy);
-  color: var(--white);
+  background: rgba(255, 255, 255, 0.28);
 }
 
-.ar-note-full {
-  margin: 0;
-  padding: 16px 18px;
+/* ---------- Scroll body ---------- */
+.ar-modal-scroll {
   overflow: auto;
-  font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
-  font-size: 12.5px;
-  line-height: 1.6;
+  background: var(--surface-tint, #f6f8fc);
+  padding: 20px;
+}
+
+/* ---------- Rich note document ---------- */
+.ar-note-doc {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.ar-note-headerblock {
+  padding: 16px 18px;
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+.ar-note-doc-title {
+  font-size: 14.5px;
+  font-weight: 800;
+  letter-spacing: 0.3px;
   color: var(--navy);
-  white-space: pre-wrap;
-  word-break: break-word;
-  background: var(--surface-tint);
+  text-transform: uppercase;
+}
+.ar-note-doc-metaline {
+  margin-top: 5px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--text-black, #1a2540);
+  line-height: 1.5;
+}
+.ar-note-doc-metaline:first-of-type {
+  margin-top: 9px;
+}
+
+.ar-note-section {
+  padding: 15px 18px 16px;
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+.ar-note-section.is-financial {
+  background: linear-gradient(180deg, #f9fbff 0%, var(--white) 100%);
+  border-color: rgba(39, 83, 179, 0.28);
+}
+.ar-note-section-title {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 0 0 11px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.7px;
+  text-transform: uppercase;
+  color: var(--blue-accent, #2753b3);
+  border-bottom: 1.5px solid var(--border);
+  padding-bottom: 8px;
+}
+.ar-note-section-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  background: rgba(39, 83, 179, 0.12);
+  color: var(--blue-accent, #2753b3);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.ar-note-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ar-note-para {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.62;
+  color: var(--text-black, #1a2540);
+}
+
+/* key/value bullets */
+.ar-note-kv {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 16px;
+  padding: 5px 0;
+  border-bottom: 1px dashed var(--border);
+}
+.ar-note-kv:last-child { border-bottom: none; }
+.ar-note-kv-label {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.ar-note-kv-value {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--navy);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* financial grid — 2 columns */
+.ar-note-fin-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px 26px;
+}
+.ar-note-fin-grid .ar-note-kv:nth-last-child(2):nth-child(odd),
+.ar-note-fin-grid .ar-note-kv:last-child {
+  border-bottom: none;
+}
+.ar-note-fin-grid .ar-note-kv-value {
+  color: var(--navy);
+}
+
+/* numbered action steps */
+.ar-note-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  padding: 3px 0;
+}
+.ar-note-step-num {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--blue-accent-2, #3d6fe0), var(--navy));
+  color: var(--white);
+  font-size: 11.5px;
+  font-weight: 800;
+}
+.ar-note-step-text {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.55;
+  color: var(--text-black, #1a2540);
+  padding-top: 1px;
+}
+.ar-note-bullet {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.55;
+  color: var(--text-black, #1a2540);
+  padding-left: 14px;
+  position: relative;
+}
+.ar-note-bullet::before {
+  content: '•';
+  position: absolute;
+  left: 0;
+  color: var(--blue-accent, #2753b3);
+  font-weight: 800;
 }
 
 .ar-note-loading {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 40px 18px;
-  font-size: 13px;
-  font-weight: 700;
+  gap: 14px;
+  padding: 44px 20px;
+}
+.ar-note-loading-title {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--navy);
+}
+.ar-note-loading-sub {
+  margin-top: 3px;
+  font-size: 12px;
+  font-weight: 600;
   color: var(--text-muted);
-  background: var(--surface-tint);
 }
 
 .ar-note-spinner {
-  width: 18px;
-  height: 18px;
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
   border-radius: 50%;
-  border: 2.5px solid rgba(39, 83, 179, 0.25);
+  border: 3px solid rgba(39, 83, 179, 0.22);
   border-top-color: var(--blue-accent);
   animation: ar-note-spin 0.7s linear infinite;
 }
@@ -417,11 +625,12 @@
 }
 
 .ar-note-error {
-  padding: 24px 18px;
+  padding: 24px 20px;
   font-size: 13px;
   font-weight: 700;
   color: var(--danger);
   background: var(--danger-bg);
+  border-radius: 10px;
 }
 
 .ar-modal-foot {
@@ -429,8 +638,9 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 14px 18px;
+  padding: 14px 20px;
   border-top: 1px solid var(--border);
+  background: var(--white);
 }
 
 .ar-modal-hint {
