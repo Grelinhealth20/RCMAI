@@ -5,9 +5,17 @@ import PatientsTable, { type RowVerificationState } from './components/PatientsT
 import Pagination from './components/Pagination'
 import VerificationPanel from './components/VerificationPanel'
 import PatientDetailModal from './components/PatientDetailModal'
-import { fetchSummary, fetchPatients, completeVerification, type PatientQuery } from './api/patientsApi'
+import {
+  fetchSummary,
+  fetchPatients,
+  completeVerification,
+  resolveManualReview,
+  runCoverageDiscovery,
+  type PatientQuery,
+} from './api/patientsApi'
 import { runVerificationPipeline } from './api/verificationApi'
-import type { Patient, SmartFilterCriteria, SummaryCounts } from './types'
+import { SPECIALTY_LIST } from './data/referenceData'
+import type { Patient, SmartFilterCriteria, Specialty, SummaryCounts } from './types'
 import './EligibilityAI.css'
 
 const DEFAULT_QUERY: PatientQuery = { status: 'all' }
@@ -49,13 +57,21 @@ function EligibilityAI() {
   }, [query])
 
   const activeStatusFilter: StatusFilterValue = query.status ?? 'all'
+  const activeSpecialty: Specialty | 'all' = query.specialty ?? 'all'
 
   const handleSelectStatus = (value: StatusFilterValue) => {
     setSmartQueryLabel(null)
     setCurrentPage(1)
     setQuery((prev) => ({
       status: prev.status === value ? 'all' : value,
+      specialty: prev.specialty,
     }))
+  }
+
+  const handleSelectSpecialty = (value: Specialty | 'all') => {
+    setSmartQueryLabel(null)
+    setCurrentPage(1)
+    setQuery((prev) => ({ status: prev.status, specialty: value }))
   }
 
   const handleApplySmartFilter = (criteria: SmartFilterCriteria, queryText: string) => {
@@ -63,12 +79,23 @@ function EligibilityAI() {
     setCurrentPage(1)
     setQuery({
       status: criteria.status,
+      specialty: criteria.specialty ?? activeSpecialty,
       payerName: criteria.payerName,
       providerName: criteria.providerName,
       patientName: criteria.patientName,
       patientId: criteria.patientId,
       keywords: criteria.keywords,
     })
+  }
+
+  // Manual-review correction re-run: transition to Active and refresh counts/list.
+  const handleResolveManualReview = async (patientId: string): Promise<Patient | undefined> => {
+    const updated = await resolveManualReview(patientId)
+    const [nextSummary, nextPatients] = await Promise.all([fetchSummary(), fetchPatients(query)])
+    setSummary(nextSummary)
+    setPatients(nextPatients)
+    if (updated) setDetailPatient(updated)
+    return updated
   }
 
   const handleClearSmartFilter = () => {
@@ -127,6 +154,30 @@ function EligibilityAI() {
       </section>
 
       <section className="eligibility-section">
+        <div className="eligibility-section-label">Specialty</div>
+        <div className="specialty-filter-row">
+          <button
+            type="button"
+            className={`specialty-chip${activeSpecialty === 'all' ? ' is-active' : ''}`}
+            onClick={() => handleSelectSpecialty('all')}
+          >
+            All Specialties
+          </button>
+          {SPECIALTY_LIST.map((s) => (
+            <button
+              key={s.id}
+              type="button"
+              className={`specialty-chip specialty-chip-${s.tone}${activeSpecialty === s.id ? ' is-active' : ''}`}
+              onClick={() => handleSelectSpecialty(s.id)}
+            >
+              <span className="specialty-chip-dot" aria-hidden="true" />
+              {s.label}
+            </button>
+          ))}
+        </div>
+      </section>
+
+      <section className="eligibility-section">
         <div className="eligibility-section-label">Smart Filter</div>
         <SmartFilterBar
           onApply={handleApplySmartFilter}
@@ -172,7 +223,12 @@ function EligibilityAI() {
         currentStepIndex={activeVerification?.currentStepIndex ?? 0}
       />
 
-      <PatientDetailModal patient={detailPatient} onClose={() => setDetailPatient(null)} />
+      <PatientDetailModal
+        patient={detailPatient}
+        onClose={() => setDetailPatient(null)}
+        onDiscover={runCoverageDiscovery}
+        onResolveManualReview={handleResolveManualReview}
+      />
     </div>
   )
 }

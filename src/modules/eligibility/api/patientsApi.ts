@@ -19,6 +19,7 @@ export async function fetchSummary(): Promise<SummaryCounts> {
 
 export interface PatientQuery {
   status?: SmartFilterCriteria['status']
+  specialty?: SmartFilterCriteria['specialty']
   payerName?: string | null
   providerName?: string | null
   patientName?: string | null
@@ -33,6 +34,9 @@ function normalize(value: string): string {
 export async function fetchPatients(query: PatientQuery = {}): Promise<Patient[]> {
   const results = MOCK_PATIENTS.filter((patient) => {
     if (query.status && query.status !== 'all' && patient.status !== query.status) {
+      return false
+    }
+    if (query.specialty && query.specialty !== 'all' && patient.specialty !== query.specialty) {
       return false
     }
     if (query.payerName && !normalize(patient.payerName).includes(normalize(query.payerName))) {
@@ -52,7 +56,7 @@ export async function fetchPatients(query: PatientQuery = {}): Promise<Patient[]
     }
     if (query.keywords && query.keywords.length > 0) {
       const haystack = normalize(
-        `${patient.patientName} ${patient.payerName} ${patient.renderingProvider} ${patient.patientId} ${patient.status}`,
+        `${patient.patientName} ${patient.payerName} ${patient.renderingProvider} ${patient.patientId} ${patient.status} ${patient.specialty}`,
       )
       const matchesAny = query.keywords.some((kw) => haystack.includes(normalize(kw)))
       if (!matchesAny) return false
@@ -83,6 +87,33 @@ export async function completeVerification(patientId: string): Promise<Patient |
   patient.pendingUnderlyingType = undefined
 
   return delay(patient, 100)
+}
+
+/**
+ * Resolves a Manual Review record after the user has entered the corrected
+ * information and re-run verification. Clears the review flags so the record
+ * transitions to Active and its detailed benefits become viewable.
+ */
+export async function resolveManualReview(patientId: string): Promise<Patient | undefined> {
+  const patient = MOCK_PATIENTS.find((p) => p.patientId === patientId)
+  if (!patient || patient.status !== 'manual-review') return patient
+  patient.status = 'active'
+  patient.manualReviewReasons = undefined
+  patient.manualReviewDetail = undefined
+  return delay(patient, 100)
+}
+
+/**
+ * Runs Coverage Discovery for an inactive patient — an SSN + address lookup for
+ * any other active policy under a different carrier. Returns the discovered
+ * coverage when one exists on file, otherwise null (no other coverage found).
+ */
+export async function runCoverageDiscovery(
+  patientId: string,
+): Promise<import('../types').DiscoveredCoverage | null> {
+  const patient = MOCK_PATIENTS.find((p) => p.patientId === patientId)
+  const found = patient?.inactiveInfo?.discovered ?? null
+  return delay(found, 900)
 }
 
 /**

@@ -22,7 +22,7 @@
 
 .modal-panel {
   width: 100%;
-  max-width: 720px;
+  max-width: 900px;
   max-height: 86vh;
   display: flex;
   flex-direction: column;
@@ -308,4 +308,268 @@
   .progress-row {
     grid-template-columns: 1fr;
   }
+}
+
+/* ============================================================================
+ * Eligibility rebuild — specialty tag, Medicare, COB, discovery, manual review
+ * ==========================================================================*/
+
+.mini-badge-off {
+  color: var(--text-muted);
+  background: rgba(120, 120, 120, 0.14);
+}
+
+.detail-note {
+  margin: 4px 0 10px;
+}
+
+/* Primary / secondary action buttons */
+.primary-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 18px;
+  border: none;
+  border-radius: 9px;
+  background: linear-gradient(135deg, var(--blue-accent-2), var(--navy));
+  color: var(--white);
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(39, 83, 179, 0.28);
+  transition: opacity 0.15s ease;
+}
+.primary-action-btn:hover:not(:disabled) { opacity: 0.92; }
+.primary-action-btn:disabled { opacity: 0.5; cursor: not-allowed; box-shadow: none; }
+
+.secondary-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 15px;
+  border: 1.5px solid var(--blue-accent);
+  border-radius: 9px;
+  background: var(--white);
+  color: var(--blue-accent);
+  font-size: 12.5px;
+  font-weight: 800;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.secondary-action-btn:hover { background: var(--blue-accent); color: var(--white); }
+
+/* Medicare section */
+.medicare-section {
+  border: 1px solid rgba(39, 83, 179, 0.25);
+  border-radius: 12px;
+  padding: 14px 16px;
+  background: rgba(39, 83, 179, 0.04);
+}
+.medicare-type {
+  display: inline-block;
+  margin-bottom: 10px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: var(--navy);
+  color: var(--white);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+/* Coordination of benefits */
+.cob-order-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+.cob-order {
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.cob-order-primary { color: var(--success); background: rgba(30, 138, 99, 0.14); }
+.cob-order-secondary { color: #92600a; background: rgba(255, 158, 0, 0.16); }
+.cob-order-tertiary { color: var(--violet-accent, #6b21a8); background: rgba(124, 58, 237, 0.14); }
+.cob-summary { font-size: 12.5px; font-weight: 600; color: var(--text-muted); }
+.cob-primary-label {
+  margin: 10px 0 6px;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--blue-accent);
+}
+
+/* Inactive banner + discovery */
+.inactive-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 13px;
+  border-radius: 9px;
+  background: rgba(120, 120, 120, 0.1);
+  border: 1px solid var(--border);
+  color: var(--text-black);
+  font-size: 12.5px;
+  font-weight: 700;
+  margin-bottom: 14px;
+}
+.inactive-banner-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-muted); flex-shrink: 0; }
+
+.discovery-card {
+  margin-top: 14px;
+  border: 1.5px dashed var(--border-strong);
+  border-radius: 12px;
+  padding: 14px 16px;
+  background: var(--surface-tint);
+}
+.discovery-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.discovery-card-head h4 { margin: 0 0 2px; }
+.discovery-result { margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--border-strong); }
+.discovery-result-found .discovery-result-head { margin-bottom: 10px; }
+.discovery-result-none { color: var(--text-muted); font-size: 12.5px; font-weight: 600; }
+
+/* Manual review block */
+.review-block { border: 1px solid rgba(255, 158, 0, 0.4); border-radius: 12px; padding: 14px 16px; background: rgba(255, 158, 0, 0.05); }
+.review-banner { display: flex; gap: 12px; align-items: flex-start; margin-bottom: 12px; }
+.review-banner-icon {
+  flex-shrink: 0;
+  width: 28px; height: 28px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 50%;
+  background: #92600a; color: var(--white);
+  font-weight: 900; font-size: 16px;
+}
+.review-banner h4 { margin: 0 0 2px; }
+.review-issues { display: flex; flex-direction: column; gap: 10px; margin-bottom: 14px; }
+.review-issue { border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; background: var(--white); }
+.review-issue-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.review-issue-field { font-size: 12.5px; font-weight: 800; color: var(--navy); }
+.review-issue-reason { margin: 6px 0 4px; font-size: 12px; color: var(--text-muted); }
+.review-issue-value { font-size: 12px; color: var(--text-black); }
+.review-issue-value code { background: var(--surface-tint-strong); padding: 1px 6px; border-radius: 5px; font-size: 11.5px; }
+
+/* Service table extras */
+.service-row-uncovered { opacity: 0.7; }
+.service-cell-note { color: var(--text-muted); font-size: 11.5px; max-width: 240px; white-space: normal; }
+
+/* Sub-dialogs (discovery + correction popups) */
+.sub-overlay {
+  position: fixed; inset: 0; z-index: 80;
+  display: flex; align-items: center; justify-content: center;
+  padding: 24px;
+  background: rgba(9, 17, 33, 0.5);
+  backdrop-filter: blur(2px);
+}
+.sub-dialog {
+  width: 440px; max-width: 100%;
+  background: var(--white);
+  border: 1px solid var(--border-strong);
+  border-radius: 16px;
+  box-shadow: 0 24px 60px rgba(9, 17, 33, 0.34);
+  padding: 20px 22px 22px;
+  animation: sub-pop 0.16s ease;
+}
+@keyframes sub-pop { from { transform: translateY(8px) scale(0.98); opacity: 0; } }
+.sub-dialog-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.sub-dialog-head h3 { margin: 0; font-size: 16px; font-weight: 800; color: var(--navy); }
+.sub-field { display: flex; flex-direction: column; gap: 5px; margin: 12px 0; }
+.sub-field > span { font-size: 12px; font-weight: 800; color: var(--navy); }
+.sub-field-hint { font-weight: 500; color: var(--text-muted); font-style: normal; }
+.sub-field input {
+  padding: 9px 12px;
+  border: 1.5px solid var(--border-strong);
+  border-radius: 9px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-black);
+  background: var(--white);
+}
+.sub-field input:focus { outline: none; border-color: var(--blue-accent); box-shadow: 0 0 0 3px rgba(39, 83, 179, 0.12); }
+.sub-dialog .primary-action-btn { width: 100%; margin-top: 6px; }
+
+
+/* ============================================================================
+ * Medicare Part A/B/C/D detail cards + specialty coverage detail
+ * ==========================================================================*/
+
+.medicare-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+.medicare-head h4 { margin: 0; }
+.medicare-year {
+  font-size: 11px; font-weight: 800; color: var(--text-muted);
+  background: var(--white); border: 1px solid var(--border); border-radius: 999px; padding: 3px 10px;
+}
+
+.part-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+.part-card {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 13px 14px;
+  background: var(--white);
+}
+.part-card-c { border-color: rgba(39, 83, 179, 0.3); background: rgba(39, 83, 179, 0.03); }
+.part-card-d { border-color: rgba(30, 138, 99, 0.3); background: rgba(30, 138, 99, 0.03); }
+.part-card-head {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 13px; font-weight: 800; color: var(--navy); margin-bottom: 6px;
+}
+.part-tag {
+  font-size: 11px; font-weight: 900; color: var(--white);
+  background: var(--navy); border-radius: 6px; padding: 2px 8px; letter-spacing: 0.3px;
+}
+.part-card-c .part-tag { background: var(--blue-accent); }
+.part-card-d .part-tag { background: var(--success); }
+.part-status { font-size: 12px; font-weight: 700; color: var(--text-black); margin-bottom: 8px; }
+.part-lines { list-style: none; margin: 0 0 8px; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.part-lines li { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; font-size: 12px; }
+.part-lines li span { color: var(--text-muted); }
+.part-lines li strong { color: var(--navy); font-weight: 800; white-space: nowrap; }
+.part-covers { font-size: 11px; color: var(--text-muted); line-height: 1.45; margin-top: 4px; }
+.part-covers-label, .spec-policies-label {
+  font-size: 10.5px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px;
+  color: var(--text-faint); margin: 8px 0 6px;
+}
+.chip-row { display: flex; flex-wrap: wrap; gap: 6px; }
+.benefit-chip {
+  font-size: 10.5px; font-weight: 700; color: var(--navy);
+  background: var(--surface-tint-strong); border: 1px solid var(--border);
+  border-radius: 999px; padding: 3px 9px;
+}
+
+/* Specialty coverage detail */
+.specialty-detail-section { border: 1px solid var(--border-strong); border-radius: 12px; padding: 14px 16px; }
+.spec-highlights {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 6px 0 12px;
+}
+.spec-highlight {
+  display: flex; flex-direction: column; gap: 2px;
+  padding: 9px 11px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface-tint);
+}
+.spec-highlight-label { font-size: 11px; font-weight: 800; color: var(--navy); }
+.spec-highlight-value { font-size: 11.5px; font-weight: 600; color: var(--text-muted); }
+.spec-policies { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 5px; }
+.spec-policies li { font-size: 12px; line-height: 1.5; color: var(--text-black); }
+
+@media (max-width: 720px) {
+  .part-grid, .spec-highlights { grid-template-columns: minmax(0, 1fr); }
 }

@@ -1,10 +1,21 @@
 import type { Patient } from '../types'
 import { STATUS_META } from '../statusMeta'
+import { SPECIALTY_DEFS } from '../data/referenceData'
 import { formatDateDisplay } from '../formatDate'
 import './PatientsTable.css'
 
 export interface RowVerificationState {
   isRunning: boolean
+}
+
+function SpecialtyTag({ specialty }: { specialty: Patient['specialty'] }) {
+  const def = SPECIALTY_DEFS[specialty]
+  return (
+    <span className={`specialty-tag specialty-tag-${def.tone}`}>
+      <span className="specialty-tag-dot" aria-hidden="true" />
+      {def.label}
+    </span>
+  )
 }
 
 interface PatientsTableProps {
@@ -29,6 +40,7 @@ function PatientsTable({
           <tr>
             <th>Patient ID</th>
             <th>Patient Name</th>
+            <th>Specialty</th>
             <th>Payer Name</th>
             <th>Date of Service</th>
             <th>Rendering Provider</th>
@@ -39,7 +51,7 @@ function PatientsTable({
         <tbody>
           {isLoading && (
             <tr>
-              <td colSpan={7} className="patients-table-state">
+              <td colSpan={8} className="patients-table-state">
                 Loading eligibility records...
               </td>
             </tr>
@@ -47,7 +59,7 @@ function PatientsTable({
 
           {!isLoading && patients.length === 0 && (
             <tr>
-              <td colSpan={7} className="patients-table-state">
+              <td colSpan={8} className="patients-table-state">
                 No records match the current filters.
               </td>
             </tr>
@@ -63,6 +75,7 @@ function PatientsTable({
                 <tr key={patient.patientId}>
                   <td className="cell-mono">{patient.patientId}</td>
                   <td className="cell-strong">{patient.patientName}</td>
+                  <td><SpecialtyTag specialty={patient.specialty} /></td>
                   <td>{patient.payerName}</td>
                   <td>{formatDateDisplay(patient.dateOfService)}</td>
                   <td>{patient.renderingProvider}</td>

@@ -86,3 +86,31 @@
   color: var(--navy);
   font-weight: 800;
 }
+
+/* ---------- Specialty filter chips ---------- */
+.specialty-filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.specialty-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 14px;
+  border: 1.5px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--white);
+  color: var(--navy);
+  font-size: 12.5px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+.specialty-chip:hover { border-color: var(--blue-accent); }
+.specialty-chip-dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
+.specialty-chip.is-active { color: var(--white); background: var(--navy); border-color: var(--navy); }
+.specialty-chip-im.is-active { background: #0f766e; border-color: #0f766e; }
+.specialty-chip-onc.is-active { background: var(--blue-accent); border-color: var(--blue-accent); }
+.specialty-chip-wnd.is-active { background: #92600a; border-color: #92600a; }
+.specialty-chip-neu.is-active { background: #6b21a8; border-color: #6b21a8; }
