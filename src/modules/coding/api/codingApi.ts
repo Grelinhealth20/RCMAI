@@ -19,7 +19,10 @@ export interface PredictedIcd {
  *  that establish its medical necessity. */
 export interface CodeMapping {
   cpt: string
-  /** Coding logic / level-of-care justification. */
+  /** The severity / level-of-care determination that yields this exact code (E/M
+   *  MDM level from problems + data + risk, or the procedure's extent/technique). */
+  levelOfCare: string
+  /** Coding logic / why this code over the adjacent level. */
   rationale: string
   /** Verbatim quote from the record documenting the service (payer/auditor view). */
   recordEvidence: string
@@ -129,6 +132,7 @@ const readMappings = (v: unknown): CodeMapping[] => {
       const o = (item ?? {}) as Record<string, unknown>
       return {
         cpt: asText(o.cpt),
+        levelOfCare: asText(o.levelOfCare),
         rationale: asText(o.rationale),
         recordEvidence: asText(o.recordEvidence),
         supportingDiagnoses: asStrArr(o.supportingDiagnoses),

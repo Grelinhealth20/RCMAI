@@ -911,10 +911,11 @@ function CodingEngine({ loadedChart = null, onCoded, onRequestNext, queuePositio
               <div className="ce-rationale">
                 {prediction.mappings.length > 0 && (
                   <div className="ce-rat-block">
-                    <span className="ce-rat-title">ICD → CPT Mapping · Why These CPTs Are Coded</span>
+                    <span className="ce-rat-title">Why Each CPT Is Predicted · Severity &amp; Level of Care</span>
                     <span className="ce-rat-sub">
-                      Each CPT is linked to the diagnosis codes that establish its medical necessity, the coding
-                      rationale, and the verbatim documentation from the medical record that supports it.
+                      For every CPT: the severity / level-of-care determination from the medical record (E/M
+                      complexity or procedure extent), the coding rationale, the diagnosis codes that establish its
+                      medical necessity, and the verbatim documentation that supports it.
                     </span>
                     <ul className="ce-map-list">
                       {prediction.mappings.map((m, i) => (
@@ -930,6 +931,12 @@ function CodingEngine({ loadedChart = null, onCoded, onRequestNext, queuePositio
                               <span className="ce-map-dx ce-map-dx-none">no linked Dx</span>
                             )}
                           </div>
+                          {m.levelOfCare && (
+                            <div className="ce-map-line ce-map-line-level">
+                              <span className="ce-map-line-label">Severity · level of care</span>
+                              <span className="ce-map-level">{m.levelOfCare}</span>
+                            </div>
+                          )}
                           {m.rationale && (
                             <div className="ce-map-line">
                               <span className="ce-map-line-label">Coding rationale</span>

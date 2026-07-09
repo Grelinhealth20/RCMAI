@@ -1012,7 +1012,7 @@ export function lookupModifier(mod: string): ModifierRef | undefined {
  * specialties (e.g. oncology's several-hundred-code set). Guidance, not a
  * whitelist — the model may use any valid code the record supports.
  */
-export function referenceForSpecialty(specialty: Specialty, icdLimit = 200, cptLimit = 140) {
+export function referenceForSpecialty(specialty: Specialty, icdLimit = 200, cptLimit = 160) {
   const icdSeen = new Set<string>()
   const icd: { code: string; description: string }[] = []
   for (const [code, description, , , sp] of ICD_ROWS) {
@@ -1024,15 +1024,33 @@ export function referenceForSpecialty(specialty: Specialty, icdLimit = 200, cptL
     if (icd.length >= icdLimit) break
   }
 
+  // HCPCS Level II codes (letter-prefixed — J drugs/biologics, A supplies/dressings,
+  // Q/C etc.) are ALWAYS grounded for the specialty, never truncated by the cap:
+  // these must match the drug/supply named in the record EXACTLY (a J-code whose
+  // descriptor names the wrong drug is a hard billing error), and the set is bounded.
+  // Numeric CPT procedures are then added up to `cptLimit`. This keeps every real
+  // administered drug in the model's grounding window regardless of dataset ordering.
+  const isHcpcsLevelII = (code: string) => /^[A-Z]/.test(code)
   const cptSeen = new Set<string>()
   const cpt: { code: string; description: string; mue: number }[] = []
   for (const [code, description, mue, sp] of CPT_ROWS) {
     if (!sp.includes(specialty)) continue
+    if (!isHcpcsLevelII(code)) continue
     const key = code.toUpperCase()
     if (cptSeen.has(key)) continue
     cptSeen.add(key)
     cpt.push({ code, description, mue })
-    if (cpt.length >= cptLimit) break
+  }
+  let numericCount = 0
+  for (const [code, description, mue, sp] of CPT_ROWS) {
+    if (!sp.includes(specialty)) continue
+    if (isHcpcsLevelII(code)) continue
+    const key = code.toUpperCase()
+    if (cptSeen.has(key)) continue
+    cptSeen.add(key)
+    cpt.push({ code, description, mue })
+    numericCount += 1
+    if (numericCount >= cptLimit) break
   }
 
   // Only NCCI edits touching a grounded CPT (keeps the prompt focused).

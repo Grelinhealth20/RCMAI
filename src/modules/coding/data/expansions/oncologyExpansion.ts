@@ -125,7 +125,7 @@ export const ONC_CPT_EXT: CptRow[] = [
   cpt('J9303', 'Injection, panitumumab, 10 mg', 120),
   cpt('J9304', 'Injection, pemetrexed (pemfexy), 10 mg', 120),
   cpt('J9305', 'Injection, pemetrexed, not otherwise specified, 10 mg', 120),
-  cpt('J9306', 'Injection, pertuzumab, 1 mg', 84),
+  cpt('J9306', 'Injection, pertuzumab, 1 mg', 840),
   cpt('J9307', 'Injection, pralatrexate, 1 mg', 60),
   cpt('J9308', 'Injection, ramucirumab, 5 mg', 340),
   cpt('J9309', 'Injection, polatuzumab vedotin-piiq, 1 mg', 180),

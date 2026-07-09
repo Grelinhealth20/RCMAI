@@ -64,7 +64,7 @@ export const WND_RECORDS: SeedPatient[] = [
           'Chronic immobility and neurogenic bowel with fecal incontinence as ongoing pressure and moisture risk factors',
         ],
         plan: [
-          'Performed excisional surgical debridement of the sacral wound with sharp excision of nonviable gluteal muscle and devitalized subcutaneous tissue down to bleeding viable tissue, including curettage of the superficial nonviable bone surface; devitalized muscle and subcutaneous tissue were the deepest tissues removed',
+          'Performed excisional surgical debridement of the sacral wound with sharp excision of nonviable gluteal muscle and devitalized subcutaneous tissue down to bleeding viable tissue, including curettage of the superficial nonviable bone surface; devitalized muscle and fascia were the deepest tissues removed, over a total debrided surface area of approximately 51 square centimeters (wound 8.4 by 6.1 cm)',
           'Obtained deep soft tissue culture and a bone biopsy specimen for microbiology and histopathology to confirm or exclude osteomyelitis',
           'Achieved hemostasis with pressure and topical hemostatic agent; applied antimicrobial alginate to the cavity with a foam secondary dressing and a moisture barrier to the periwound',
           'Continued air-fluidized pressure redistribution surface and reinforced strict every-two-hour turning and offloading of the sacrum',
@@ -138,7 +138,7 @@ export const WND_RECORDS: SeedPatient[] = [
           'Nonadherence to prescribed offloading footwear as a modifiable barrier to healing',
         ],
         plan: [
-          'Performed selective sharp debridement of the plantar ulcer with paring of the hyperkeratotic callus rim and removal of nonviable fibrinous slough and devitalized skin and subcutaneous tissue to a clean bleeding granular base; skin and subcutaneous tissue were the tissue levels removed, with no muscle or bone excised',
+          'Performed selective sharp debridement of the plantar ulcer with paring of the hyperkeratotic callus rim and removal of nonviable fibrinous slough and devitalized skin and subcutaneous tissue to a clean bleeding granular base; skin and subcutaneous tissue were the tissue levels removed, with no muscle or bone excised, over a total debrided surface area of approximately 5 square centimeters (wound 2.6 by 2.1 cm)',
           'Probed the wound to exclude a sinus tract to bone; probe-to-bone negative',
           'Applied a moisture-balancing collagen dressing with a foam cover and initiated total contact offloading with a removable walker boot, with strong counseling on continuous wear',
           'Intensified glycemic management with an increase in basal insulin and reinforced adherence and diet',
@@ -209,7 +209,7 @@ export const WND_RECORDS: SeedPatient[] = [
           'Therapeutic anticoagulation for prior venous thromboembolism, managed with careful hemostasis during debridement',
         ],
         plan: [
-          'Performed debridement of the venous ulcer with removal of nonviable yellow slough and devitalized epidermal and dermal tissue to a granulating base using sharp and curette technique, with careful hemostasis given anticoagulation; skin and subcutaneous slough were the tissue levels removed',
+          'Performed selective sharp debridement of the venous ulcer with removal of nonviable yellow slough and devitalized epidermal and dermal tissue to a granulating base using sharp and curette technique, with careful hemostasis given anticoagulation; skin and subcutaneous slough were the tissue levels removed, over a total debrided surface area of approximately 17 square centimeters (wound 4.8 by 3.5 cm)',
           'Applied a multilayer compression system with an Unna paste boot as the contact layer followed by a compression wrap to deliver graduated compression and reverse venous hypertension',
           'Counseled strongly on sustained compression, leg elevation above heart level when seated, calf muscle pump exercises, and weight reduction',
           'Managed periwound stasis dermatitis with an emollient and low-potency topical measures, and counseled against scratching',

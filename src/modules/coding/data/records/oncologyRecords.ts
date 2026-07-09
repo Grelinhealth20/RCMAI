@@ -63,7 +63,7 @@ export const ONC_RECORDS: SeedPatient[] = [
           'Hypertension, controlled',
         ],
         plan: [
-          'Proceed with cycle four: docetaxel 75 mg per square meter intravenously, carboplatin dosed to area under the curve six, trastuzumab at maintenance intravenous dosing, and pertuzumab at maintenance intravenous dosing, all through the chest port',
+          'Cycle four administered today through the right chest port as sequential intravenous infusions with no infusion reaction: pertuzumab 420 mg (fixed maintenance dose) infused over 30 minutes from 09:05 to 09:35; trastuzumab 426 mg (6 mg/kg maintenance dosing at 71 kg) infused over 30 minutes from 09:40 to 10:10; docetaxel 133 mg (75 mg per square meter, body surface area 1.77) infused over 60 minutes from 10:20 to 11:20; and carboplatin 750 mg (target area under the curve six by the Calvert formula) infused over 30 minutes from 11:25 to 11:55',
           'Premedicate with dexamethasone, ondansetron, and an H2 blocker; provide oral dexamethasone taper for delayed nausea',
           'Administer pegfilgrastim on-body injector approximately twenty-seven hours after infusion with loratadine for bone pain prophylaxis',
           'Continue loperamide as needed and reinforce hydration and neutropenic precautions',
@@ -144,8 +144,8 @@ export const ONC_RECORDS: SeedPatient[] = [
           'No evidence of immune-related adverse events',
         ],
         plan: [
-          'Administer maintenance pembrolizumab at the standard flat intravenous dose every three weeks',
-          'Administer pemetrexed at 500 mg per square meter intravenously with continued folic acid and vitamin B12 supplementation',
+          'Administered today through a peripheral intravenous line as sequential infusions without reaction: pemetrexed 1,000 mg (500 mg per square meter, body surface area 2.01) infused over 10 minutes from 10:00 to 10:10, followed by maintenance pembrolizumab 200 mg (fixed flat dose) infused over 30 minutes from 10:20 to 10:50; pre-infusion folic acid and vitamin B12 supplementation continued',
+          'Maintenance pembrolizumab with pemetrexed continues every three weeks; pemetrexed dose individualized to renal function each cycle',
           'Continue monitoring for immune-related adverse events including pneumonitis, colitis, hepatitis, and endocrinopathies; check thyroid panel each cycle',
           'Continue COPD inhalers and dual antiplatelet therapy; coordinate with cardiology',
           'Repeat restaging CT in nine weeks',
@@ -221,7 +221,7 @@ export const ONC_RECORDS: SeedPatient[] = [
           'Hypothyroidism, stable on levothyroxine',
         ],
         plan: [
-          'Administer oxaliplatin 85 mg per square meter intravenously over two hours, leucovorin 400 mg per square meter intravenously, and fluorouracil 400 mg per square meter intravenous bolus followed by 2400 mg per square meter as a continuous infusion over forty-six hours via take-home ambulatory pump through the port',
+          'Cycle six modified FOLFOX administered today through the left chest port: oxaliplatin 141 mg (85 mg per square meter, body surface area 1.66) infused over 120 minutes from 09:15 to 11:15 concurrently with leucovorin 664 mg (400 mg per square meter) infused over 120 minutes; then fluorouracil 664 mg (400 mg per square meter) by intravenous bolus at 11:20, followed by fluorouracil 3,984 mg (2,400 mg per square meter) as a continuous infusion over 46 hours via a take-home ambulatory pump connected to the port',
           'Given grade two neuropathy, maintain full dose this cycle but plan an oxaliplatin dose reduction of twenty-five percent next cycle if symptoms progress or interfere with function',
           'Premedicate with ondansetron and dexamethasone; provide antiemetics for home use',
           'Reinforce strict cold avoidance, glove use, and pump care instructions; schedule pump disconnect in forty-six hours',
@@ -298,7 +298,7 @@ export const ONC_RECORDS: SeedPatient[] = [
           'Tumor lysis syndrome risk, low at this point in treatment, on allopurinol',
         ],
         plan: [
-          'Administer cycle four R-CHOP: rituximab intravenously at standard dosing, cyclophosphamide 750 mg per square meter intravenously, doxorubicin 50 mg per square meter intravenously, vincristine 1.4 mg per square meter intravenously capped at 2 mg, and prednisone 100 mg oral daily for five days',
+          'Cycle four R-CHOP administered today through the right chest port: rituximab 765 mg (375 mg per square meter, body surface area 2.04) infused intravenously at an escalating rate over 4 hours from 09:00 to 13:00 with reaction monitoring; cyclophosphamide 1,530 mg (750 mg per square meter) infused over 60 minutes from 13:10 to 14:10; doxorubicin 102 mg (50 mg per square meter) by slow intravenous push through a free-flowing line from 14:15 to 14:30; vincristine 2 mg (1.4 mg per square meter, capped at 2 mg) by intravenous push at 14:35; and prednisone 100 mg orally daily for five days',
           'Premedicate for rituximab with acetaminophen, an antihistamine, and corticosteroid; infuse rituximab at an escalating rate with reaction monitoring',
           'Administer pegfilgrastim the following day for febrile neutropenia prophylaxis',
           'Continue entecavir for the duration of therapy and at least six months beyond, monitor hepatitis B viral load',

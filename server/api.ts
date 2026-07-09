@@ -1185,6 +1185,75 @@ function annotateCodes(icd: PredCode[], cpt: PredCode[]) {
 }
 
 /**
+ * Real-coder discipline, enforced deterministically after the model returns so the
+ * claim never carries padding or bundled components even if the model slips:
+ *   1. Every billed code must carry verbatim documentation — a code with no
+ *      "evidence" span is unsupported padding and is dropped.
+ *   2. Duplicate codes are collapsed (ICD by code, CPT by base+modifier signature),
+ *      keeping the first (highest-ranked) occurrence.
+ *   3. NCCI column-2 components of a hard bundle (modifierAllowed=false) are removed
+ *      when their column-1 comprehensive code is also present — exactly what a
+ *      certified coder does (report the deepest/most-comprehensive code only). The
+ *      removed pairs are returned so the audit can show the correct-coding action.
+ */
+function sanitizePredictedCodes(
+  icd: PredCode[],
+  cpt: PredCode[],
+): { icd: PredCode[]; cpt: PredCode[]; bundled: { code: string; into: string; rationale: string }[] } {
+  // ICD: require evidence, dedupe by normalized code (first wins = primary/highest rank).
+  const icdSeen = new Set<string>()
+  const icdClean: PredCode[] = []
+  for (const c of icd) {
+    if (!c.evidence) continue
+    const key = normalizeIcd(c.code)
+    if (!key || icdSeen.has(key)) continue
+    icdSeen.add(key)
+    icdClean.push(c)
+  }
+
+  // CPT: require evidence, then consolidate duplicate lines by base+modifier
+  // signature. A repeated code (e.g. an add-on like 96417 listed once per drug)
+  // belongs on ONE claim line with summed units, not as duplicate lines — so we
+  // merge units rather than drop, preserving the true service count.
+  const cptBySig = new Map<string, PredCode>()
+  const cptOrder: string[] = []
+  for (const c of cpt) {
+    if (!c.evidence) continue
+    const { base, modifiers } = splitCptModifiers(c.code)
+    if (!base) continue
+    const sig = [base, ...modifiers].join('-')
+    const existing = cptBySig.get(sig)
+    if (existing) {
+      const a = Number.parseInt(existing.units ?? '', 10)
+      const b = Number.parseInt(c.units ?? '', 10)
+      if (Number.isFinite(a) && Number.isFinite(b)) existing.units = String(a + b)
+      continue
+    }
+    const copy = { ...c }
+    cptBySig.set(sig, copy)
+    cptOrder.push(sig)
+  }
+  let cptClean: PredCode[] = cptOrder.map((s) => cptBySig.get(s) as PredCode)
+
+  // NCCI hard bundles: drop the column-2 component when column-1 is also present.
+  const baseOf = (c: PredCode) => splitCptModifiers(c.code).base
+  const dropBases = new Set<string>()
+  const bundled: { code: string; into: string; rationale: string }[] = []
+  for (const edit of NCCI_EDITS) {
+    if (edit.modifierAllowed) continue // soft edit — leave for the audit to flag a modifier, don't delete
+    if (dropBases.has(edit.column2)) continue
+    const hasC1 = cptClean.some((c) => baseOf(c) === edit.column1)
+    const hasC2 = cptClean.some((c) => baseOf(c) === edit.column2)
+    if (!hasC1 || !hasC2) continue
+    dropBases.add(edit.column2)
+    bundled.push({ code: edit.column2, into: edit.column1, rationale: edit.rationale })
+  }
+  if (dropBases.size > 0) cptClean = cptClean.filter((c) => !dropBases.has(baseOf(c)))
+
+  return { icd: icdClean, cpt: cptClean, bundled }
+}
+
+/**
  * Route: coding-predict — GPT-4.1 billing-ready code prediction. The prompt is
  * grounded with the detected specialty's real reference set (codes, NCCI edits,
  * LCD/NCD policies), and the model output is verified server-side against those
@@ -1237,7 +1306,7 @@ Return ONLY strict JSON of this EXACT shape:
     { "modifier": "<code>", "description": "<meaning>", "appliesTo": "<the CPT it attaches to>", "rationale": "<why THIS record requires it>" }
   ],
   "mappings": [
-    { "cpt": "<CPT/HCPCS code>", "rationale": "<coding logic: the service performed and, for an E/M, the level of care justified by problems addressed + data reviewed + risk (MDM) or documented total time>", "recordEvidence": "<a VERBATIM quote from THIS record that documents the service supporting this CPT — the sentence a payer/auditor would read>", "supportingDiagnoses": ["<ICD-10-CM code(s) from icdCodes that establish medical necessity for this CPT>"] }
+    { "cpt": "<CPT/HCPCS code>", "levelOfCare": "<the SEVERITY / LEVEL-OF-CARE determination that yields THIS EXACT code — for an E/M: the MDM level from number/complexity of problems addressed + amount/complexity of data reviewed + risk of management (or the documented total time) that supports this specific level, e.g. 'Moderate MDM — 2 stable chronic illnesses (T2DM, HTN) + prescription drug management + independent lab review → 99214 (moderate complexity, established patient)'; for a procedure/infusion/debridement: the extent/technique/depth/size/units performed that select the code>", "rationale": "<coding logic: the service performed and why THIS code over the adjacent lower/higher level>", "recordEvidence": "<a VERBATIM quote from THIS record that documents the service supporting this CPT — the sentence a payer/auditor would read>", "supportingDiagnoses": ["<ICD-10-CM code(s) from icdCodes that establish medical necessity for this CPT>"] }
   ],
   "audit": [
     { "severity": "critical" | "warning" | "info", "item": "<short CMS/NCCI/MUE/LCD finding>", "detail": "<what to fix and why the payer requires it>" }
@@ -1245,16 +1314,26 @@ Return ONLY strict JSON of this EXACT shape:
 }
 
 STRICT RULES (target 100% billable, first-pass-clean accuracy):
-- DERIVE EVERYTHING FROM THIS RECORD ONLY. Never output a fixed/default/boilerplate code set — two different records must produce different codes. Extract ONLY codes the documentation clearly supports; do NOT invent, pad, or upcode. If the record supports no codes of a type, return an empty array.
-- DRUG / HCPCS EXACTNESS: when the record names an administered drug (chemotherapy, biologic, antiemetic, growth factor, contrast), you MUST report the HCPCS/J-code whose official descriptor names THAT EXACT drug. Match by drug NAME, not by a nearby number. Never substitute a different drug's J-code (e.g. doxorubicin is J9000 — NOT docetaxel J9171; vincristine is J9370 — NOT J9371). If the SPECIALTY REFERENCE lists the drug, use that code verbatim; if it is not listed, use the correct real HCPCS for the named drug. A J-code whose descriptor does not match the drug in the record is a coding error even if the code is otherwise valid.
+- CODE LIKE A CERTIFIED HUMAN CODER — ACCURACY AND MINIMALISM OVER VOLUME. Report the SMALLEST set of codes that fully and correctly represents THIS encounter. Leaving off a code the record does not clearly support is safer than padding — when a code is not clearly documented, LEAVE IT OFF. Never output a fixed/default/boilerplate set; two different records must produce different codes. If the record supports no codes of a type, return an empty array.
+- EVERY code MUST be backed by a verbatim "evidence" span from THIS record. If you cannot quote the documentation for a code, DO NOT emit it. Do NOT invent, pad, upcode, or add "just in case" codes.
+- DIAGNOSES — CODE ONLY WHAT WAS ADDRESSED THIS ENCOUNTER (MEAT). Assign a diagnosis ONLY if it was Monitored, Evaluated, Assessed, or Treated at THIS date of service, or it directly drives the medical decision-making/management documented today. Do NOT code a condition merely listed in the past medical history / problem list that was not touched at this visit.
+- DO NOT separately code signs/symptoms that are routinely integral to a confirmed, definitive diagnosis (e.g. do not code cough or fever alongside a documented pneumonia, or chest pain alongside a confirmed acute MI). Code a symptom ONLY when no definitive diagnosis accounts for it, or a coding guideline directs it be reported separately.
+- UNCERTAIN DIAGNOSES (outpatient): do NOT code conditions documented as "probable", "suspected", "rule-out", "likely", "questionable", or "consistent with" — code the documented signs/symptoms instead. Only code a diagnosis stated as established/confirmed.
+- RESOLVED / HISTORICAL conditions are NOT coded as active problems; use a personal-history (Z) code only when that history affects current care.
+- PROCEDURES / SERVICES — CODE ONLY WHAT WAS PERFORMED TODAY BY THIS PROVIDER. Emit a CPT/HCPCS ONLY for a service actually performed and documented at THIS DOS (with a technique/site/size/start-stop time, or an explicit "performed/administered/obtained today"). Do NOT bill labs, imaging, or procedures that were merely ORDERED for the future, had RESULTS REVIEWED from a prior date, or were done at another facility / by another provider — those support the E/M level; they are not separate line items on this claim.
+- ONE E/M PER ENCOUNTER: assign at most a single E/M code at the correct level — never multiple E/M codes for the same visit.
+- DO NOT UNBUNDLE: report the single most comprehensive code and omit its bundled components (e.g. a comprehensive metabolic panel instead of its component chemistries; a complete ECG instead of the tracing-only code; only the deepest debridement of a given wound). Respect the NCCI edits provided in the reference.
+- DRUG / HCPCS EXACTNESS: when the record documents an administered drug (chemotherapy, biologic, antiemetic, growth factor, contrast), you MUST report the HCPCS/J-code whose official descriptor names THAT EXACT drug. Match by drug NAME, not by a nearby number. Never substitute a different drug's J-code (e.g. doxorubicin is J9000 — NOT docetaxel J9171; pertuzumab is J9306 — NOT pemetrexed J9305; vincristine is J9370 — NOT J9371). If the SPECIALTY REFERENCE lists the drug, use that code verbatim; if it is not listed, use the correct real HCPCS for the named drug. A J-code whose descriptor does not match the drug in the record is a coding error even if the code is otherwise valid.
+- DRUG UNITS: when the administered amount is documented — either directly in mg, or as mg/m² / AUC / mg-per-kg WITH the body surface area or weight present to compute it — report the drug's J-code with "units" = administered milligrams ÷ the code's per-unit dosage (e.g. docetaxel 133 mg on J9171 "per 1 mg" = 133 units; carboplatin 750 mg on J9045 "per 50 mg" = 15 units; trastuzumab 426 mg on J9355 "per 10 mg" = 43 units), rounded to the nearest whole unit. Do NOT withhold a drug that was administered simply because the dose is expressed per-m²/AUC when the BSA/weight is documented — compute it. Only omit the drug when no administered amount can be determined from the record, and raise a CDI item for the missing dose.
 - "evidence" MUST be copied VERBATIM (character-for-character) from the record — the minimal supporting span. Never paraphrase. A code with no supporting text does not belong on the claim.
 - DIAGNOSIS RANKING (primary → secondary → tertiary → …): return "icdCodes" already ORDERED — the first element is the primary/first-listed diagnosis (mark it "primary": true), the definitive condition chiefly responsible for the encounter/service. Every remaining diagnosis is "primary": false and MUST be listed in strict descending clinical relevance (secondary, tertiary, then the rest) in payer-submission order. Assign EXACTLY ONE primary. Apply ICD-10-CM sequencing rules: when the encounter is SOLELY for administration of chemotherapy, immunotherapy, or radiation therapy, sequence the encounter code Z51.11 / Z51.12 / Z51.0 FIRST (primary), with the malignancy second; for a visit to treat/manage a condition (E/M, procedure, debridement), the condition treated is primary. Code every diagnosis to the highest documented specificity (laterality, stage, acuity, episode, causal/manifestation linkage); prefer a specific code over an unspecified one and raise a CDI item when specificity is missing.
 - CPT BY SEVERITY / LEVEL OF CARE: choose the E/M level strictly from the documentation — the number and complexity of problems addressed, the amount/complexity of data reviewed, and the risk of management (MDM), or the documented total time. Do not default to a mid-level code; a straightforward visit is 99212/99202 and a high-complexity visit is 99215/99205. For procedures/infusions/debridement, select the exact code for the technique, depth, site, and size documented, with correct units.
 - MODIFIERS ONLY IF REQUIRED by guidelines — never speculatively: 25 (significant, separately identifiable E/M same day as a minor procedure), 59/X{EPSU} (distinct site/session), RT/LT/50 (laterality), JW/JZ (single-dose-vial drug wastage/attestation), 26/TC (professional/technical). Omit the modifiers array entirely when none apply.
-- ICD↔CPT MAPPING (map each CPT to ITS OWN necessity — do NOT attach the whole diagnosis list to every line): in "mappings", for EVERY CPT provide (a) "rationale" — the coding logic / level-of-care justification, (b) "recordEvidence" — a VERBATIM quote from this record proving the service was performed, and (c) "supportingDiagnoses" — ONLY the specific ICD-10 code(s) that establish medical necessity for THAT particular CPT. Different services generally carry DIFFERENT supporting diagnoses: a chemotherapy/immunotherapy drug or its administration links to the malignancy being treated (plus the Z51.1x encounter code); a supportive drug links to its own indication (an antiemetic → the nausea/vomiting or its prophylaxis; a growth factor → the neutropenia; hydration → the volume/electrolyte problem); an E/M links ONLY to the distinct problems evaluated and managed at that visit (e.g. the neuropathy, diabetes, hypertension, or a new symptom) — NOT to the chemo codes' diagnoses; a procedure links to the condition it treats. Do not lazily repeat the same one or two diagnoses across unrelated CPTs; attach the minimal, most specific diagnosis that justifies each line. Every CPT must map to at least one diagnosis on the claim.
-- Set "units" from documented quantity (time-based infusion hours, sq cm of debridement/graft, number of nerve studies) and respect MUE per-day maximums.
+- ICD↔CPT MAPPING (map each CPT to ITS OWN necessity — do NOT attach the whole diagnosis list to every line): in "mappings", for EVERY CPT provide (a) "levelOfCare" — the severity / level-of-care determination that yields THIS exact code (E/M: the MDM level from problems + data + risk, or documented total time; procedure: the extent/technique/depth/size/units), (b) "rationale" — the coding logic and why this code over the adjacent level, (c) "recordEvidence" — a VERBATIM quote from this record proving the service was performed, and (d) "supportingDiagnoses" — ONLY the specific ICD-10 code(s) that establish medical necessity for THAT particular CPT. Different services generally carry DIFFERENT supporting diagnoses: a chemotherapy/immunotherapy drug or its administration links to the malignancy being treated (plus the Z51.1x encounter code); a supportive drug links to its own indication (an antiemetic → the nausea/vomiting or its prophylaxis; a growth factor → the neutropenia; hydration → the volume/electrolyte problem); an E/M links ONLY to the distinct problems evaluated and managed at that visit (e.g. the neuropathy, diabetes, hypertension, or a new symptom) — NOT to the chemo codes' diagnoses; a procedure links to the condition it treats. Do not lazily repeat the same one or two diagnoses across unrelated CPTs; attach the minimal, most specific diagnosis that justifies each line. Every CPT must map to at least one diagnosis on the claim.
+- Set "units" from documented quantity (time-based infusion hours, sq cm of debridement/graft, number of nerve studies) and respect MUE per-day maximums. For an "each additional" add-on code, report it ONCE with "units" equal to the number of additional services performed — e.g. an initial sequential chemo infusion plus three more drugs = 96413 (units 1) and 96417 (units 3), not four separate lines.
+- WOUND SURFACE AREA: for debridement and skin-substitute grafts, determine the treated surface area in square centimeters — from an explicitly documented area, or compute it as length × width (cm) from the wound measurements when no area is stated. Report the primary code for the first increment (debridement 11042-11047/97597 = first 20 sq cm; skin substitute 15271/15275 = first 25 sq cm) PLUS the matching "each additional" add-on code with units for the remaining area. Examples: a 51 sq cm muscle/fascia debridement = 11043 (first 20) + 11046 (each additional 20 sq cm) units 2; a 17 sq cm selective debridement = 97597 alone; a 45 sq cm skin substitute to the leg = 15271 + 15272 units 1. Match the debridement code to the DEEPEST tissue removed (skin/subcut 97597 or 11042; muscle/fascia 11043; bone 11044).
 - In "audit", surface NCCI bundling, MUE, and LCD/NCD medical-necessity risks specific to this case, naming the policy where one applies.
-- Handle long/complex records: capture every separately billable service, not just the chief complaint.
+- Handle long/complex records by capturing every service that was actually PERFORMED and is separately billable — but never pad. A longer note does not mean more codes; only the documented, performed, and non-bundled services belong on the claim.
 
 SPECIALTY REFERENCE (${specialtyLabel}) — use for grounding and to validate against real NCCI/MUE/LCD-NCD rules:
 ${JSON.stringify(reference)}`
@@ -1264,7 +1343,7 @@ ${JSON.stringify(reference)}`
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
       body: JSON.stringify({
         model: 'gpt-4.1',
-        temperature: 0.1,
+        temperature: 0,
         max_tokens: 8192,
         response_format: { type: 'json_object' },
         messages: [
@@ -1281,8 +1360,10 @@ ${JSON.stringify(reference)}`
     const data = (await openaiRes.json()) as { choices: { message: { content: string } }[] }
     const parsed = JSON.parse(data.choices?.[0]?.message?.content ?? '{}') as Record<string, unknown>
 
-    const icd = readPredCodes(parsed.icdCodes)
-    const cpt = readPredCodes(parsed.cptCodes)
+    // Real-coder discipline enforced server-side: drop unsupported (no-evidence)
+    // padding, collapse duplicates, and remove NCCI-bundled components before the
+    // codes are annotated, mapped, and audited.
+    const { icd, cpt, bundled } = sanitizePredictedCodes(readPredCodes(parsed.icdCodes), readPredCodes(parsed.cptCodes))
     const { icdOut, cptOut } = annotateCodes(icd, cpt)
 
     const rv = (parsed.recordValidation ?? {}) as Record<string, unknown>
@@ -1339,26 +1420,62 @@ ${JSON.stringify(reference)}`
       : []
 
     // ICD↔CPT mapping + CPT rationale (why each CPT is coded from the record).
+    // The mapping is constrained to codes that survived sanitization: a CPT must be
+    // one that is actually on the claim, and each supporting diagnosis must be an
+    // ICD actually on the claim — so no dropped/hallucinated code leaks into the
+    // rationale and every link is real.
     const cptCodeSet = new Set(cpt.map((c) => splitCptModifiers(c.code).base))
+    const icdCodeSet = new Set(icd.map((c) => normalizeIcd(c.code)))
     const mappings = Array.isArray(parsed.mappings)
       ? parsed.mappings
           .map((m) => {
             const o = (m ?? {}) as Record<string, unknown>
             return {
               cpt: typeof o.cpt === 'string' ? o.cpt.trim() : '',
+              levelOfCare: typeof o.levelOfCare === 'string' ? o.levelOfCare.trim() : '',
               rationale: typeof o.rationale === 'string' ? o.rationale.trim() : '',
               recordEvidence: typeof o.recordEvidence === 'string' ? o.recordEvidence.trim() : '',
               supportingDiagnoses: Array.isArray(o.supportingDiagnoses)
-                ? o.supportingDiagnoses.filter((d): d is string => typeof d === 'string' && d.trim().length > 0).map((d) => d.trim())
+                ? o.supportingDiagnoses
+                    .filter((d): d is string => typeof d === 'string' && d.trim().length > 0)
+                    .map((d) => d.trim())
+                    .filter((d) => icdCodeSet.size === 0 || icdCodeSet.has(normalizeIcd(d)))
                 : [],
             }
           })
           .filter((m) => m.cpt.length > 0 && (cptCodeSet.size === 0 || cptCodeSet.has(splitCptModifiers(m.cpt).base)))
       : []
 
+    // Guideline-grounded mapping accuracy: for a CPT governed by a real LCD/NCD
+    // coverage policy, the medically-necessary diagnoses are DEFINED by the policy's
+    // supporting ICD prefixes (e.g. HbA1c → diabetes E10/E11/E13/R73; lipid panel →
+    // E78/I10/I25; CBC → anemia/heme; TSH → thyroid; PSA → prostate). So we narrow
+    // that CPT's supportingDiagnoses to the claim ICDs the policy actually covers,
+    // instead of the model repeating the same whole diagnosis list on every line.
+    // Non-policy CPTs (E/M, most procedures/infusions) keep the model's per-line
+    // mapping. When the policy matches no claim diagnosis we leave the model's list
+    // untouched (the audit separately flags any medical-necessity gap).
+    const refinedMappings = mappings.map((m) => {
+      const base = splitCptModifiers(m.cpt).base
+      const policy = COVERAGE_POLICIES.find((p) => p.cpt.includes(base))
+      if (!policy) return m
+      const covered = icd
+        .map((c) => c.code)
+        .filter((code) => policy.supportingIcdPrefixes.some((p) => normalizeIcd(code).startsWith(normalizeIcd(p))))
+      return covered.length > 0 ? { ...m, supportingDiagnoses: covered } : m
+    })
+
     // Deterministic, rule-verified audit merged ahead of the model's findings.
+    // Bundled-out components are reported as an informational correct-coding action
+    // so the coder can see WHY a code the model proposed is not on the final claim.
     const verifiedAudit = auditCoding(icd, cpt)
-    const audit = [...verifiedAudit, ...modelAudit]
+    const bundledNotes = bundled.map((b) => ({
+      severity: 'info' as const,
+      item: `Bundled — ${b.code} not separately reportable`,
+      detail: `${b.rationale}. ${b.code} was removed from the claim; its work is included in ${b.into} (NCCI PTP).`,
+      source: 'CMS NCCI PTP',
+    }))
+    const audit = [...verifiedAudit, ...bundledNotes, ...modelAudit]
 
     // Deterministic per-family compliance validation (always shows each check).
     const validations = validateCoding(icd, cpt)
@@ -1371,7 +1488,7 @@ ${JSON.stringify(reference)}`
       icdCodes: icdOut,
       cptCodes: cptOut,
       modifiers,
-      mappings,
+      mappings: refinedMappings,
       validations,
       audit,
     })
