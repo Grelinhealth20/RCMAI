@@ -98,6 +98,24 @@ const codesText = (list: string[]): string => (list.length > 0 ? list.join(', ')
 
 const specialtyLabel = (id: ChartRow['specialty']): string => SPECIALTIES.find((s) => s.id === id)?.label ?? id
 
+/** Map each specialty to one of the existing card tones so the worklist reuses
+ *  the module palette (no new colors). */
+const SPECIALTY_TONE: Record<ChartRow['specialty'], string> = {
+  oncology: 'onc',
+  'internal-medicine': 'im',
+  'wound-care': 'wnd',
+  neurology: 'neu',
+}
+
+function SpecialtyTag({ specialty }: { specialty: ChartRow['specialty'] }) {
+  return (
+    <span className={`cw-spec cw-spec-${SPECIALTY_TONE[specialty]}`}>
+      <span className="cw-spec-dot" aria-hidden="true" />
+      {specialtyLabel(specialty)}
+    </span>
+  )
+}
+
 function StatusBadge({ status }: { status: ChartRow['status'] }) {
   const cls =
     status === 'Coded' ? 'cw-status-coded' : status === 'Submitted' ? 'cw-status-submitted' : status === 'Coding' ? 'cw-status-coding' : 'cw-status-pending'
@@ -477,6 +495,7 @@ function ChartWorklist({ rows, filesReceived, onAddRows, onSendToCoding, onSendF
               <th>Patient ID</th>
               <th>Claim ID</th>
               <th>Patient Name</th>
+              <th>Specialty</th>
               <th>Payer Name</th>
               <th>Date of Service</th>
               <th>ICD&apos;s</th>
@@ -489,7 +508,7 @@ function ChartWorklist({ rows, filesReceived, onAddRows, onSendToCoding, onSendF
           <tbody>
             {filteredRows.length === 0 ? (
               <tr>
-                <td className="cw-empty" colSpan={10}>
+                <td className="cw-empty" colSpan={11}>
                   {rows.length === 0
                     ? 'No charts yet — upload a clinical document above to extract dates of service.'
                     : 'No charts match the current filter.'}
@@ -501,6 +520,7 @@ function ChartWorklist({ rows, filesReceived, onAddRows, onSendToCoding, onSendF
                   <td className="cw-mono">{r.patientId}</td>
                   <td className="cw-mono">{r.claimId}</td>
                   <td>{r.patientName}</td>
+                  <td><SpecialtyTag specialty={r.specialty} /></td>
                   <td>{r.payerName}</td>
                   <td className="cw-mono">{r.dos}</td>
                   <td className={r.icd.length ? 'cw-codes' : 'cw-blank'}>{codesText(r.icd) || '—'}</td>

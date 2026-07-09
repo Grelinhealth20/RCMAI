@@ -895,10 +895,24 @@
     height: auto;
   }
 
+  /* Keep the record editor a usable fixed size, but let the predicted-codes
+     panel grow with its content so the whole page scrolls instead of trapping
+     the codes/mappings/validation in a cramped inner scroll box. */
   .ce-record-input,
-  .ce-record-view,
-  .ce-codes-scroll {
+  .ce-record-view {
     min-height: 340px;
+  }
+
+  .ce-panel {
+    min-height: 0;
+  }
+
+  .ce-codes-scroll {
+    flex: none;
+    min-height: 0;
+    max-height: none;
+    overflow: visible;
+    padding-right: 0;
   }
 
   .ce-box-grid {
@@ -1259,3 +1273,133 @@
 @media (prefers-reduced-motion: reduce) {
   .ce-review { animation: none; }
 }
+
+/* ============================================================================
+ * Primary / Secondary diagnosis tag on ICD boxes
+ * ==========================================================================*/
+.ce-rank {
+  align-self: flex-start;
+  margin-top: 5px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+}
+.ce-rank-primary { color: var(--white); background: var(--navy); }
+.ce-rank-secondary { color: var(--text-muted); background: var(--surface-tint-strong); border: 1px solid var(--border); }
+
+/* ============================================================================
+ * Coding rationale & compliance section
+ * ==========================================================================*/
+.ce-rationale {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 4px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+.ce-rat-block { display: flex; flex-direction: column; gap: 9px; }
+.ce-rat-title {
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--navy);
+}
+
+/* ICD → CPT mapping */
+.ce-map-list { display: flex; flex-direction: column; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.ce-map-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-tint);
+}
+.ce-map-head { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+.ce-map-cpt {
+  font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  font-size: 12.5px;
+  font-weight: 800;
+  color: var(--white);
+  background: linear-gradient(135deg, var(--blue-accent-2, var(--blue-accent)), var(--navy));
+  padding: 3px 9px;
+  border-radius: 7px;
+}
+.ce-map-arrow { color: var(--text-faint); font-weight: 800; }
+.ce-map-dx {
+  font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  font-size: 11.5px;
+  font-weight: 800;
+  color: var(--navy);
+  background: color-mix(in srgb, var(--teal-accent-bright) 14%, var(--white));
+  border: 1px solid color-mix(in srgb, var(--teal-accent-bright) 40%, transparent);
+  padding: 3px 8px;
+  border-radius: 7px;
+}
+.ce-map-dx-none { color: var(--danger); background: var(--danger-bg); border-color: var(--danger-border, rgba(200,40,40,.3)); }
+.ce-map-why { font-size: 11.5px; font-weight: 600; color: var(--text-muted); line-height: 1.45; }
+
+.ce-rat-sub { font-size: 11px; font-weight: 600; color: var(--text-muted); line-height: 1.45; margin-top: -3px; }
+
+/* Per-CPT rationale + record-evidence lines */
+.ce-map-line { display: flex; flex-direction: column; gap: 2px; margin-top: 4px; }
+.ce-map-line-label {
+  font-size: 9.5px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-faint);
+}
+.ce-map-line-evidence {
+  padding: 7px 10px;
+  border-left: 3px solid var(--teal-accent-bright);
+  border-radius: 0 8px 8px 0;
+  background: color-mix(in srgb, var(--teal-accent-bright) 8%, var(--white));
+}
+.ce-map-line-evidence .ce-map-line-label { color: color-mix(in srgb, var(--teal-accent-bright) 65%, var(--navy)); }
+.ce-map-evidence {
+  font-size: 11.5px;
+  font-weight: 600;
+  font-style: italic;
+  color: var(--navy);
+  line-height: 1.5;
+}
+
+/* Compliance validation */
+.ce-val-list { display: flex; flex-direction: column; gap: 7px; margin: 0; padding: 0; list-style: none; }
+.ce-val-item {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 9px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  border-left-width: 3px;
+  background: var(--white);
+}
+.ce-val-item.is-pass { border-left-color: var(--success-live); }
+.ce-val-item.is-warning { border-left-color: var(--warning); }
+.ce-val-item.is-critical { border-left-color: var(--danger); background: var(--danger-bg); }
+.ce-val-edit {
+  flex: none;
+  width: 82px;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  color: var(--navy);
+  padding-top: 1px;
+}
+.ce-val-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.ce-val-name { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 12px; font-weight: 800; color: var(--navy); }
+.ce-val-status { font-size: 10px; font-weight: 900; }
+.ce-val-item.is-pass .ce-val-status { color: var(--success-live); }
+.ce-val-item.is-warning .ce-val-status { color: #8a5a00; }
+.ce-val-item.is-critical .ce-val-status { color: var(--danger); }
+.ce-val-detail { font-size: 11px; font-weight: 500; color: var(--text-muted); line-height: 1.4; }

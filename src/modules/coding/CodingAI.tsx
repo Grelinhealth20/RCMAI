@@ -52,9 +52,10 @@ function CodingAI() {
   const active = TABS.find((t) => t.id === activeTab) ?? TABS[0]
 
   /* ---- Shared chart-worklist state (spans the Dashboard and Engine tabs) ----
-   * Seeded with a live book of work (30 received · 26 DOS · 9 coded · 7 pending
-   * · 10 submitted). Uploading a document still appends new rows on top, so the
-   * extraction flow is unaffected. */
+   * Seeded with 24 complete, unique clinical records (6 per specialty — Oncology,
+   * Internal Medicine, Wound Care, Neurology), each a Pending chart ready to code
+   * live. Uploading a document still appends new rows on top, so the extraction
+   * flow is unaffected. */
   const [rows, setRows] = useState<ChartRow[]>(SEED_ROWS)
   const [filesReceived, setFilesReceived] = useState(SEED_FILES_RECEIVED)
   // Coding queue: the ordered row ids currently being run through the engine.

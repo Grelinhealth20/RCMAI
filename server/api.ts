@@ -931,7 +931,7 @@ function detectSpecialty(record: string): Specialty {
   const signals: Record<Specialty, string[]> = {
     oncology: ['chemotherapy', 'chemo', 'oncology', 'carcinoma', 'malignant', 'metastatic', 'tumor', 'neoplasm', 'infusion', 'cycle', 'neutropenia', 'lymphoma', 'leukemia', 'myeloma', 'psa', 'cea', 'radiation'],
     'wound-care': ['wound', 'ulcer', 'debridement', 'pressure injury', 'granulation', 'eschar', 'slough', 'skin substitute', 'unna', 'necrotic', 'diabetic foot', 'wagner', 'exudate', 'undermining'],
-    neurology: ['seizure', 'epilepsy', 'migraine', 'headache', 'eeg', 'emg', 'nerve conduction', 'neuropathy', 'multiple sclerosis', 'parkinson', 'stroke', 'tia', 'lumbar puncture', 'botox', 'chemodenervation', 'polysomnography', 'sleep apnea', 'radiculopathy'],
+    neurology: ['seizure', 'epilepsy', 'migraine', 'headache', 'eeg', 'emg', 'nerve conduction', 'neuropathy', 'multiple sclerosis', 'parkinson', 'stroke', 'tia', 'lumbar puncture', 'botox', 'chemodenervation', 'polysomnography', 'sleep apnea', 'radiculopathy', 'neurology', 'neurologist', 'dementia', 'alzheimer', 'tremor', 'myasthenia', 'guillain', 'ataxia', 'vertigo', 'evoked potential', 'cognitive', 'demyelinating'],
     'internal-medicine': ['diabetes', 'hypertension', 'hyperlipidemia', 'copd', 'ckd', 'heart failure', 'a1c', 'lipid panel', 'metabolic panel', 'tsh', 'annual wellness', 'primary care', 'follow-up', 'spirometry', 'ecg'],
   }
   ;(Object.keys(signals) as Specialty[]).forEach((sp) => {
@@ -952,6 +952,8 @@ interface PredCode {
   evidence: string
   units?: string
   modifiers?: string[]
+  /** ICD only: the model's primary-diagnosis flag. */
+  primary?: boolean
 }
 
 const readPredCodes = (v: unknown): PredCode[] => {
@@ -967,6 +969,7 @@ const readPredCodes = (v: unknown): PredCode[] => {
         modifiers: Array.isArray(o.modifiers)
           ? o.modifiers.filter((m): m is string => typeof m === 'string' && m.trim().length > 0).map((m) => m.trim().toUpperCase())
           : [],
+        primary: o.primary === true || o.rank === 'primary',
       }
     })
     .filter((c) => c.code.length > 0)
@@ -1008,8 +1011,12 @@ function auditCoding(icd: PredCode[], cpt: PredCode[]) {
   }
 
   // NCCI procedure-to-procedure edits.
+  const ncciAuditSeen = new Set<string>()
   for (const edit of NCCI_EDITS) {
     if (baseSet.has(edit.column1) && baseSet.has(edit.column2)) {
+      const pairKey = `${edit.column1}+${edit.column2}`
+      if (ncciAuditSeen.has(pairKey)) continue
+      ncciAuditSeen.add(pairKey)
       const hasMod = cpt.some(
         (c) => [edit.column1, edit.column2].includes(splitCptModifiers(c.code).base) && (c.modifiers?.length ?? 0) > 0,
       )
@@ -1049,10 +1056,106 @@ function auditCoding(icd: PredCode[], cpt: PredCode[]) {
   return findings
 }
 
+/** Deterministic compliance validation reported per edit family (NCCI PTP, MUE,
+ *  LCD/NCD medical necessity, modifier appropriateness). Always emits one row per
+ *  family — PASS when clean — so the UI can clearly show each check was run. */
+function validateCoding(icd: PredCode[], cpt: PredCode[]) {
+  type Status = 'pass' | 'warning' | 'critical'
+  const out: { edit: string; status: Status; item: string; detail: string }[] = []
+
+  const cptBases = cpt.map((c) => splitCptModifiers(c.code).base).filter(Boolean)
+  const baseSet = new Set(cptBases)
+  const billableIcd = icd.map((c) => normalizeIcd(c.code)).filter(Boolean)
+
+  // NCCI Procedure-to-Procedure
+  const ncci: { crit: boolean; msg: string }[] = []
+  const ncciSeen = new Set<string>() // dedupe identical edits merged from multiple reference sources
+  for (const edit of NCCI_EDITS) {
+    if (baseSet.has(edit.column1) && baseSet.has(edit.column2)) {
+      const pairKey = `${edit.column1}+${edit.column2}`
+      if (ncciSeen.has(pairKey)) continue
+      ncciSeen.add(pairKey)
+      const hasMod = cpt.some(
+        (c) => [edit.column1, edit.column2].includes(splitCptModifiers(c.code).base) && (c.modifiers?.length ?? 0) > 0,
+      )
+      if (!edit.modifierAllowed) ncci.push({ crit: true, msg: `${edit.column1}+${edit.column2}: ${edit.rationale} — bundled, not separately reportable.` })
+      else if (!hasMod) ncci.push({ crit: false, msg: `${edit.column1}+${edit.column2}: ${edit.rationale} — append 59/X{EPSU} if distinct.` })
+    }
+  }
+  out.push(
+    cptBases.length === 0
+      ? { edit: 'NCCI PTP', status: 'pass', item: 'NCCI Procedure-to-Procedure', detail: 'No procedures to bundle.' }
+      : ncci.length === 0
+        ? { edit: 'NCCI PTP', status: 'pass', item: 'NCCI Procedure-to-Procedure', detail: `No unbundling conflicts among ${baseSet.size} procedure(s).` }
+        : { edit: 'NCCI PTP', status: ncci.some((f) => f.crit) ? 'critical' : 'warning', item: 'NCCI Procedure-to-Procedure', detail: ncci.map((f) => f.msg).join(' ') },
+  )
+
+  // MUE
+  const mue: string[] = []
+  for (const c of cpt) {
+    const entry = lookupCpt(c.code)
+    const units = Number.parseInt(c.units ?? '', 10)
+    if (entry && Number.isFinite(units) && units > entry.mue) mue.push(`${entry.code}: ${units} units exceed the per-day MUE of ${entry.mue}.`)
+  }
+  out.push(
+    cpt.length === 0
+      ? { edit: 'MUE', status: 'pass', item: 'Medically Unlikely Edits', detail: 'No units to validate.' }
+      : mue.length === 0
+        ? { edit: 'MUE', status: 'pass', item: 'Medically Unlikely Edits', detail: 'All unit counts within CMS per-day maximums.' }
+        : { edit: 'MUE', status: 'warning', item: 'Medically Unlikely Edits', detail: mue.join(' ') },
+  )
+
+  // LCD/NCD medical necessity
+  const policies: string[] = []
+  const lcd: string[] = []
+  for (const base of baseSet) {
+    const policy = COVERAGE_POLICIES.find((p) => p.cpt.includes(base))
+    if (!policy) continue
+    policies.push(policy.policyId)
+    const supported = billableIcd.some((code) => policy.supportingIcdPrefixes.some((p) => code.startsWith(normalizeIcd(p))))
+    if (!supported) lcd.push(`${base} (${policy.policyId} — ${policy.title}): no linked diagnosis meets coverage. ${policy.criterion}`)
+  }
+  out.push(
+    policies.length === 0
+      ? { edit: 'LCD/NCD', status: 'pass', item: 'Medical Necessity (LCD / NCD)', detail: 'No coverage-policy-governed services on this claim.' }
+      : lcd.length === 0
+        ? { edit: 'LCD/NCD', status: 'pass', item: 'Medical Necessity (LCD / NCD)', detail: `Supporting diagnosis present for ${[...new Set(policies)].join(', ')}.` }
+        : { edit: 'LCD/NCD', status: 'warning', item: 'Medical Necessity (LCD / NCD)', detail: lcd.join(' ') },
+  )
+
+  // Modifier appropriateness
+  const modBad: string[] = []
+  let anyMods = false
+  for (const c of cpt) {
+    for (const m of c.modifiers ?? []) {
+      anyMods = true
+      if (!VALID_MODIFIERS.has(m)) modBad.push(`"${m}" on ${splitCptModifiers(c.code).base} is not a recognized modifier.`)
+    }
+  }
+  out.push(
+    !anyMods
+      ? { edit: 'Modifier', status: 'pass', item: 'Modifier Appropriateness', detail: 'No modifiers required for this claim.' }
+      : modBad.length === 0
+        ? { edit: 'Modifier', status: 'pass', item: 'Modifier Appropriateness', detail: 'All appended modifiers are valid and supported.' }
+        : { edit: 'Modifier', status: 'warning', item: 'Modifier Appropriateness', detail: modBad.join(' ') },
+  )
+
+  return out
+}
+
 /** Attaches reference metadata (verified flag, MUE, official description) to
  *  each predicted code so the UI can show which codes are reference-confirmed. */
+const RANK_LABELS = ['Primary', 'Secondary', 'Tertiary', 'Quaternary', 'Quinary', 'Senary', 'Septenary', 'Octonary', 'Nonary', 'Denary']
+const rankLabelFor = (i: number): string => RANK_LABELS[i] ?? `Dx ${i + 1}`
+
 function annotateCodes(icd: PredCode[], cpt: PredCode[]) {
-  const icdOut = icd.map((c) => {
+  // Order the diagnoses primary-first so rank (Primary → Secondary → Tertiary …)
+  // reflects payer submission order; the model already returns them ranked, but a
+  // flagged primary that is not first is hoisted to position 1.
+  const primaryIdx = icd.findIndex((c) => c.primary === true)
+  const orderedIcd = primaryIdx > 0 ? [icd[primaryIdx], ...icd.filter((_, i) => i !== primaryIdx)] : icd
+
+  const icdOut = orderedIcd.map((c, i) => {
     const ref = lookupIcd(c.code)
     return {
       code: c.code,
@@ -1061,6 +1164,9 @@ function annotateCodes(icd: PredCode[], cpt: PredCode[]) {
       verified: Boolean(ref),
       unspecified: ref?.unspecified ?? false,
       billable: ref?.billable ?? true,
+      primary: i === 0,
+      rank: i + 1,
+      rankLabel: rankLabelFor(i),
     }
   })
   const cptOut = cpt.map((c) => {
@@ -1122,29 +1228,35 @@ Return ONLY strict JSON of this EXACT shape:
     { "title": "<clinical documentation improvement opportunity>", "detail": "<what to clarify/query the provider for>", "impact": "<why it matters: specificity, HCC/risk capture, medical necessity, or reimbursement>" }
   ],
   "icdCodes": [
-    { "code": "<ICD-10-CM>", "description": "<official short description>", "evidence": "<verbatim quote from the record>" }
+    { "code": "<ICD-10-CM>", "description": "<official short description>", "evidence": "<verbatim quote from the record>", "primary": <true for the ONE primary/first-listed diagnosis, false for the rest> }
   ],
   "cptCodes": [
-    { "code": "<CPT/HCPCS>", "description": "<procedure description>", "evidence": "<verbatim quote>", "units": "<integer as string>", "modifiers": ["<modifier if required, e.g. 25/59/XS/RT/LT>"] }
+    { "code": "<CPT/HCPCS>", "description": "<procedure description>", "evidence": "<verbatim quote>", "units": "<integer as string>", "modifiers": ["<modifier ONLY if guidelines require it, e.g. 25/59/XS/RT/LT/JZ>"] }
   ],
   "modifiers": [
     { "modifier": "<code>", "description": "<meaning>", "appliesTo": "<the CPT it attaches to>", "rationale": "<why THIS record requires it>" }
+  ],
+  "mappings": [
+    { "cpt": "<CPT/HCPCS code>", "rationale": "<coding logic: the service performed and, for an E/M, the level of care justified by problems addressed + data reviewed + risk (MDM) or documented total time>", "recordEvidence": "<a VERBATIM quote from THIS record that documents the service supporting this CPT — the sentence a payer/auditor would read>", "supportingDiagnoses": ["<ICD-10-CM code(s) from icdCodes that establish medical necessity for this CPT>"] }
   ],
   "audit": [
     { "severity": "critical" | "warning" | "info", "item": "<short CMS/NCCI/MUE/LCD finding>", "detail": "<what to fix and why the payer requires it>" }
   ]
 }
 
-STRICT RULES (target 100% billable accuracy):
-- Extract ONLY codes the documentation clearly supports. Do NOT invent, pad, or upcode. If the record supports no codes of a type, return an empty array.
-- "evidence" MUST be copied VERBATIM (character-for-character) from the record — the minimal supporting span. Never paraphrase.
-- Order ICD codes by clinical relevance (primary/definitive diagnosis first). Code to the highest documented specificity (laterality, stage, acuity, episode); avoid unspecified codes when the record supports a specific one, and flag it in CDI if it does not.
-- Assign a modifier ONLY when the record + correct-coding rules require it (same-day E/M with a minor procedure → 25 on the E/M; distinct sites/sessions → 59/XS; laterality → RT/LT; discarded single-dose vial drug → JW/JZ). Do not add modifiers speculatively.
-- Set "units" from documented quantity (time-based infusions, sq cm of debridement/graft, number of nerve studies). Respect MUE per-day maximums in the reference.
+STRICT RULES (target 100% billable, first-pass-clean accuracy):
+- DERIVE EVERYTHING FROM THIS RECORD ONLY. Never output a fixed/default/boilerplate code set — two different records must produce different codes. Extract ONLY codes the documentation clearly supports; do NOT invent, pad, or upcode. If the record supports no codes of a type, return an empty array.
+- DRUG / HCPCS EXACTNESS: when the record names an administered drug (chemotherapy, biologic, antiemetic, growth factor, contrast), you MUST report the HCPCS/J-code whose official descriptor names THAT EXACT drug. Match by drug NAME, not by a nearby number. Never substitute a different drug's J-code (e.g. doxorubicin is J9000 — NOT docetaxel J9171; vincristine is J9370 — NOT J9371). If the SPECIALTY REFERENCE lists the drug, use that code verbatim; if it is not listed, use the correct real HCPCS for the named drug. A J-code whose descriptor does not match the drug in the record is a coding error even if the code is otherwise valid.
+- "evidence" MUST be copied VERBATIM (character-for-character) from the record — the minimal supporting span. Never paraphrase. A code with no supporting text does not belong on the claim.
+- DIAGNOSIS RANKING (primary → secondary → tertiary → …): return "icdCodes" already ORDERED — the first element is the primary/first-listed diagnosis (mark it "primary": true), the definitive condition chiefly responsible for the encounter/service. Every remaining diagnosis is "primary": false and MUST be listed in strict descending clinical relevance (secondary, tertiary, then the rest) in payer-submission order. Assign EXACTLY ONE primary. Apply ICD-10-CM sequencing rules: when the encounter is SOLELY for administration of chemotherapy, immunotherapy, or radiation therapy, sequence the encounter code Z51.11 / Z51.12 / Z51.0 FIRST (primary), with the malignancy second; for a visit to treat/manage a condition (E/M, procedure, debridement), the condition treated is primary. Code every diagnosis to the highest documented specificity (laterality, stage, acuity, episode, causal/manifestation linkage); prefer a specific code over an unspecified one and raise a CDI item when specificity is missing.
+- CPT BY SEVERITY / LEVEL OF CARE: choose the E/M level strictly from the documentation — the number and complexity of problems addressed, the amount/complexity of data reviewed, and the risk of management (MDM), or the documented total time. Do not default to a mid-level code; a straightforward visit is 99212/99202 and a high-complexity visit is 99215/99205. For procedures/infusions/debridement, select the exact code for the technique, depth, site, and size documented, with correct units.
+- MODIFIERS ONLY IF REQUIRED by guidelines — never speculatively: 25 (significant, separately identifiable E/M same day as a minor procedure), 59/X{EPSU} (distinct site/session), RT/LT/50 (laterality), JW/JZ (single-dose-vial drug wastage/attestation), 26/TC (professional/technical). Omit the modifiers array entirely when none apply.
+- ICD↔CPT MAPPING (map each CPT to ITS OWN necessity — do NOT attach the whole diagnosis list to every line): in "mappings", for EVERY CPT provide (a) "rationale" — the coding logic / level-of-care justification, (b) "recordEvidence" — a VERBATIM quote from this record proving the service was performed, and (c) "supportingDiagnoses" — ONLY the specific ICD-10 code(s) that establish medical necessity for THAT particular CPT. Different services generally carry DIFFERENT supporting diagnoses: a chemotherapy/immunotherapy drug or its administration links to the malignancy being treated (plus the Z51.1x encounter code); a supportive drug links to its own indication (an antiemetic → the nausea/vomiting or its prophylaxis; a growth factor → the neutropenia; hydration → the volume/electrolyte problem); an E/M links ONLY to the distinct problems evaluated and managed at that visit (e.g. the neuropathy, diabetes, hypertension, or a new symptom) — NOT to the chemo codes' diagnoses; a procedure links to the condition it treats. Do not lazily repeat the same one or two diagnoses across unrelated CPTs; attach the minimal, most specific diagnosis that justifies each line. Every CPT must map to at least one diagnosis on the claim.
+- Set "units" from documented quantity (time-based infusion hours, sq cm of debridement/graft, number of nerve studies) and respect MUE per-day maximums.
 - In "audit", surface NCCI bundling, MUE, and LCD/NCD medical-necessity risks specific to this case, naming the policy where one applies.
 - Handle long/complex records: capture every separately billable service, not just the chief complaint.
 
-SPECIALTY REFERENCE (${specialtyLabel}):
+SPECIALTY REFERENCE (${specialtyLabel}) — use for grounding and to validate against real NCCI/MUE/LCD-NCD rules:
 ${JSON.stringify(reference)}`
 
     const openaiRes = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -1153,7 +1265,7 @@ ${JSON.stringify(reference)}`
       body: JSON.stringify({
         model: 'gpt-4.1',
         temperature: 0.1,
-        max_tokens: 4096,
+        max_tokens: 8192,
         response_format: { type: 'json_object' },
         messages: [
           { role: 'system', content: systemPrompt },
@@ -1226,9 +1338,30 @@ ${JSON.stringify(reference)}`
           .filter((a) => a.item.length > 0)
       : []
 
+    // ICD↔CPT mapping + CPT rationale (why each CPT is coded from the record).
+    const cptCodeSet = new Set(cpt.map((c) => splitCptModifiers(c.code).base))
+    const mappings = Array.isArray(parsed.mappings)
+      ? parsed.mappings
+          .map((m) => {
+            const o = (m ?? {}) as Record<string, unknown>
+            return {
+              cpt: typeof o.cpt === 'string' ? o.cpt.trim() : '',
+              rationale: typeof o.rationale === 'string' ? o.rationale.trim() : '',
+              recordEvidence: typeof o.recordEvidence === 'string' ? o.recordEvidence.trim() : '',
+              supportingDiagnoses: Array.isArray(o.supportingDiagnoses)
+                ? o.supportingDiagnoses.filter((d): d is string => typeof d === 'string' && d.trim().length > 0).map((d) => d.trim())
+                : [],
+            }
+          })
+          .filter((m) => m.cpt.length > 0 && (cptCodeSet.size === 0 || cptCodeSet.has(splitCptModifiers(m.cpt).base)))
+      : []
+
     // Deterministic, rule-verified audit merged ahead of the model's findings.
     const verifiedAudit = auditCoding(icd, cpt)
     const audit = [...verifiedAudit, ...modelAudit]
+
+    // Deterministic per-family compliance validation (always shows each check).
+    const validations = validateCoding(icd, cpt)
 
     return cacheAndSend(cacheKey, {
       specialty,
@@ -1238,6 +1371,8 @@ ${JSON.stringify(reference)}`
       icdCodes: icdOut,
       cptCodes: cptOut,
       modifiers,
+      mappings,
+      validations,
       audit,
     })
   } catch (err) {
@@ -1272,9 +1407,12 @@ const RECORD_SPECIALTY_GUIDANCE: Record<string, string> = {
 }
 
 /**
- * Route: generate-record — GPT-4.1 realistic longitudinal chart generator. Not
- * cached so every generation is unique. A "length" finish_reason is surfaced as
- * a clear actionable error rather than a JSON.parse failure.
+ * Route: generate-record — GPT-4.1 enterprise chart generator. Two phases: a
+ * fast scaffold call (patient + N-DOS plan) then one parallel GPT-4.1 call per
+ * DOS to write the full note (~1,200-1,400 words each). Parallelism keeps the
+ * whole chart inside the serverless time limit while restoring GPT-4.1 quality
+ * and depth. Not cached, so every generation is unique. Truncated DOS notes are
+ * retried once with a tighter target.
  */
 async function handleGenerateRecord(body: Record<string, unknown>, apiKey: string): Promise<RouteResult> {
   try {
@@ -1285,116 +1423,81 @@ async function handleGenerateRecord(body: Record<string, unknown>, apiKey: strin
     const specialtyId = typeof body.specialty === 'string' ? body.specialty : 'internal-medicine'
     const specialtyLabel = RECORD_SPECIALTY_LABEL[specialtyId] ?? 'Internal Medicine'
     const rawEnc = typeof body.encounters === 'number' ? body.encounters : Number.parseInt(String(body.encounters), 10)
-    const encounters = Math.max(1, Math.min(6, Number.isFinite(rawEnc) ? rawEnc : 3))
+    // Capped at 4 DOS so the whole chart generates within the serverless function
+    // time limit (a single very long generation would otherwise time out in prod).
+    const encounters = Math.max(1, Math.min(4, Number.isFinite(rawEnc) ? rawEnc : 3))
 
     const specialtyGuidance = RECORD_SPECIALTY_GUIDANCE[specialtyId] ?? RECORD_SPECIALTY_GUIDANCE['internal-medicine']
-
-    const systemPrompt = `You are a senior attending physician and clinical documentation author generating REALISTIC, enterprise-grade clinical chart documentation for a ${specialtyLabel} patient. This chart is used to test an automated medical-coding engine, so it must read exactly like authentic hospital/clinic documentation — internally consistent, clinically accurate, and richly detailed — for a fictional (privacy-safe) patient.
-
-Generate ONE patient's longitudinal record with EXACTLY ${encounters} unique date(s) of service (DOS), in chronological order. The first DOS is a comprehensive History & Physical; subsequent DOS are detailed follow-up, procedure, or consultation notes that clinically progress the SAME patient's course. Each DOS must document a UNIQUE encounter and set of services — different chief complaint/reason, different exam focus, and different work performed (do not repeat the same visit).
-
-SPECIALTY GROUNDING (${specialtyLabel}): ${specialtyGuidance}
-
-Return ONLY strict JSON of this EXACT shape:
-{
-  "patient": {
-    "name": "<fictional full name>",
-    "mrn": "<fictional medical record number>",
-    "dob": "<MM/DD/YYYY>",
-    "age": <integer>,
-    "sex": "<Male|Female>",
-    "insurance": "<plausible payer/plan name>",
-    "pcp": "<referring/primary provider name, credentials>",
-    "attending": "<rendering provider name, credentials>",
-    "facility": "<clinic/hospital name>"
-  },
-  "encounters": [
-    {
-      "dos": "<MM/DD/YYYY>",
-      "type": "<History & Physical | Follow-up Progress Note | Procedure Note | Consultation>",
-      "setting": "<Outpatient Clinic | Inpatient | Infusion Center | Wound Care Center | etc.>",
-      "reason": "<one-line chief complaint / reason for visit>",
-      "page1": "<Markdown clinical note — PAGE 1 of this DOS: Chief Complaint; History of Present Illness (detailed, several paragraphs); Review of Systems; Past Medical History; Past Surgical History; Medications (name/dose/route/frequency); Allergies; Social History; Family History; Vital Signs; comprehensive Physical Examination by system>",
-      "page2": "<Markdown clinical note — PAGE 2 of this DOS: Results/Data reviewed (labs, imaging, studies described in prose); Assessment (numbered problem list written in clinical WORDS with clinical reasoning); Plan (per-problem, medications, diagnostics ordered, procedures performed or planned — all described in words); Patient Education & Counseling; Disposition/Follow-up; provider attestation and electronic signature block>"
-    }
-  ]
-}
-
-ABSOLUTE RULES:
-- Do NOT include ANY billing codes anywhere: no ICD-10 / ICD / diagnosis codes, no CPT / HCPCS / procedure codes, no modifiers, no code numbers in parentheses. Diagnoses and procedures must be written in plain clinical language only (e.g., "type 2 diabetes mellitus with diabetic polyneuropathy", "selective sharp debridement of the wound bed"). If you are tempted to write a code, write the words instead.
-- Make every note COMPLEX, DETAILED, and enterprise-grade — the kind of authentic chart a coding auditor reviews to assign codes. Include multiple comorbidities, complete medication regimens (name/dose/route/frequency), pertinent positives AND negatives, concrete objective measurements (full vital signs, wound dimensions, neurologic/musculoskeletal exam findings, performance status, specific lab values and imaging findings), and explicit clinical reasoning for each problem.
-- LENGTH IS A HARD REQUIREMENT: each DOS (page1 + page2 combined) MUST be a MINIMUM of 1500 words, and longer is better. Aim for roughly 800-1100 words in page1 and 700-1000 words in page2. A DOS under 1500 words is a FAILURE — expand the HPI, ROS (all 10+ systems), the multi-system physical exam, the data/results review, and the per-problem assessment and plan until the encounter is fully and densely documented. ABSOLUTELY NO short notes, stubs, placeholders, summarizing, or one-line sections — every section must be thoroughly and specifically documented in full prose.
-- SPECIFICITY IS MANDATORY — this chart must be coding-accurate, never generic. For EVERY diagnosis document the elements a coder needs for a specific (non-unspecified) code: laterality (left/right/bilateral), acuity (acute/chronic/acute-on-chronic), episode, stage/grade/severity, and the causal/manifestation linkage between related conditions (e.g., "due to", "with", "secondary to"). NEVER write vague throwaway phrases like "labs unremarkable", "exam normal", "stable", or "continue current management" without the concrete values and findings behind them. Every lab must have an actual numeric value with units (and reference-range flag where abnormal); every vital sign a real number; every imaging/pathology/study result described with concrete findings in prose; every medication an exact dose, route, and frequency tied to its indication.
-- NO GENERIC OR TEMPLATED PATIENTS. Vary demographics, ethnicity, social history, occupation, and the specific disease presentation from any typical archetype — do not default to the same stock "62-year-old with diabetes and hypertension" chart. Names, MRN, facility, and providers must be plausible and specific but fictional (privacy-safe). Numbers (vitals, labs, doses, measurements) must be internally consistent and clinically plausible, not round placeholder values.
-- CODING-READY BY CONSTRUCTION — the note must contain everything an automated engine needs to predict accurate ICD-10-CM diagnoses, CPT/HCPCS services, and modifiers in real time, without inventing facts:
-  * Diagnoses (for ICD-10): document each problem to full specificity — laterality, acuity/episode, stage/grade/severity, and explicit causal/manifestation linkage ("due to", "with", "secondary to") so a specific (non-unspecified) code is supportable.
-  * Evaluation & Management level (for the E/M CPT): make the level derivable from the note itself — document the number and complexity of problems addressed, the amount/complexity of data reviewed (labs, imaging, external notes, independent historian), and the risk of management (medication management, procedures considered, hospitalization risk). Where appropriate, state total time spent on the encounter and that it includes counseling/coordination of care, so the level can be supported by either MDM or time.
-  * Procedures/services (for procedural CPT/HCPCS): when a procedure, infusion, injection, debridement, or diagnostic study is performed, document every billable element — site and laterality, technique/approach, extent, size/measurements, number of lesions/units, substances/agents with dose, start/stop or duration for time-based services, and who performed it.
-  * Modifiers: include the facts that justify modifiers when clinically true — laterality (left/right/bilateral → -LT/-RT/-50), a significant, separately identifiable E/M on the same day as a procedure (supports -25), a distinct procedural service at a separate site/session (-59/-X{EPSU}), staged/related/unplanned return, and repeat services. Document these circumstances explicitly in the narrative rather than as codes.
-  Note: still write ALL of the above in plain clinical WORDS only — never emit an actual code or modifier suffix; the documentation must merely SUPPORT them.
-- Each DOS must be a DISTINCT, UNIQUE encounter for the SAME patient: a different reason for visit / chief complaint, a different focus of examination, and DIFFERENT services or work performed (e.g., comprehensive H&P, then a procedure with an operative/procedure note, then a follow-up managing results and titrating therapy, then a consultation) — never repeat or lightly reword a prior visit. Chronic conditions carry forward and evolve, but the reason for each visit and the services rendered must clearly differ.
-- Keep the patient and clinical facts CONSISTENT across all DOS (same name, MRN, DOB; chronic conditions carry forward and evolve realistically).
-- ALL dates (dob and every dos) MUST be formatted mm/dd/yyyy (e.g., 02/14/2026).
-- EVERY date of service MUST fall within 01/01/2026 through 03/31/2026 (this year, January through March only). Space the DOS realistically (days to weeks apart), in chronological order, all inside that window.
-- Specialty focus: ${specialtyLabel}. Tailor the presentations, exams, and services to this specialty.
-- Output valid JSON only, no commentary.`
-
-    // Budget ~4,200 output tokens per DOS. Each DOS is required to be 1,500+
-    // words across its two pages (~2,000+ tokens of prose) plus JSON escaping,
-    // so this leaves headroom for the model to run long. Capped at the gpt-4.1
-    // 32,768-token output ceiling so even 6 dense DOS complete without
-    // truncating the JSON mid-chart.
-    const maxTokens = Math.min(32000, encounters * 4200 + 2500)
+    const str = (v: unknown): string => (typeof v === 'string' ? v.trim() : '')
     // Variety seed nudges the model away from repeating a stock patient archetype.
     const varietySeed = Math.random().toString(36).slice(2, 10).toUpperCase()
 
-    const openaiRes = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
-      body: JSON.stringify({
-        model: 'gpt-4.1',
-        temperature: 0.8,
-        max_tokens: maxTokens,
-        response_format: { type: 'json_object' },
-        messages: [
-          { role: 'system', content: systemPrompt },
-          {
-            role: 'user',
-            content: `Generate the ${specialtyLabel} chart now with exactly ${encounters} unique date(s) of service. Make each encounter clinically distinct, specific, and richly detailed with concrete numeric values throughout. Remember: no codes of any kind anywhere. Uniqueness token ${varietySeed} — use it only to ensure this patient, presentation, and set of specific findings differ from a typical/templated chart; do not print the token in the output.`,
-          },
-        ],
-      }),
-    })
+    /* ------------------------------------------------------------------------
+     * Enterprise generation is done in two phases with GPT-4.1 (accurate,
+     * production-grade clinical prose) while staying inside the serverless time
+     * limit: (1) a small, fast SCAFFOLD call builds the patient and a plan of N
+     * distinct encounters; (2) each DOS note is then written by its OWN GPT-4.1
+     * call IN PARALLEL, so no single request is large enough to time out and the
+     * charts are richer (~1,200-1,400 words per DOS) than a single giant call.
+     * ----------------------------------------------------------------------*/
 
-    if (!openaiRes.ok) {
-      return { status: 502, json: { error: `OpenAI API error: ${await openaiRes.text()}` } }
-    }
-
-    const data = (await openaiRes.json()) as {
-      choices: { message: { content: string }; finish_reason?: string }[]
-    }
-    const choice = data.choices?.[0]
-    const content = choice?.message?.content ?? '{}'
-    // A "length" finish means the output hit max_tokens and the JSON is
-    // truncated — surface a clear, actionable error instead of a cryptic
-    // JSON.parse failure.
-    if (choice?.finish_reason === 'length') {
-      return {
-        status: 502,
-        json: {
-          error: `The chart was too long to finish in one response (${encounters} DOS). Please generate fewer dates of service and try again.`,
-        },
+    const callJson = async (
+      model: string,
+      temperature: number,
+      maxTokens: number,
+      system: string,
+      user: string,
+    ): Promise<{ ok: true; data: Record<string, unknown> } | { ok: false; error: string; truncated?: boolean }> => {
+      const res = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+        body: JSON.stringify({
+          model,
+          temperature,
+          max_tokens: maxTokens,
+          response_format: { type: 'json_object' },
+          messages: [
+            { role: 'system', content: system },
+            { role: 'user', content: user },
+          ],
+        }),
+      })
+      if (!res.ok) return { ok: false, error: `OpenAI API error: ${await res.text()}` }
+      const json = (await res.json()) as { choices: { message: { content: string }; finish_reason?: string }[] }
+      const choice = json.choices?.[0]
+      const truncated = choice?.finish_reason === 'length'
+      try {
+        return { ok: true, data: JSON.parse(choice?.message?.content ?? '{}') as Record<string, unknown> }
+      } catch {
+        return { ok: false, error: 'malformed model output', truncated }
       }
     }
-    let parsed: Record<string, unknown>
-    try {
-      parsed = JSON.parse(content) as Record<string, unknown>
-    } catch {
-      return { status: 502, json: { error: 'The model returned malformed record data. Please try again.' } }
-    }
 
-    const patientObj = (parsed.patient ?? {}) as Record<string, unknown>
-    const str = (v: unknown): string => (typeof v === 'string' ? v.trim() : '')
+    // ---- Phase 1: patient + course plan (small, fast) ----
+    const scaffoldSystem = `You are a senior attending physician planning a REALISTIC, enterprise-grade ${specialtyLabel} chart for a fictional (privacy-safe) patient, used to test an automated medical-coding engine. Design ONE patient and a plan of EXACTLY ${encounters} DISTINCT date(s) of service (DOS) that progress the SAME patient's course.
+
+SPECIALTY GROUNDING (${specialtyLabel}): ${specialtyGuidance}
+
+Return ONLY strict JSON:
+{
+  "patient": { "name": "<full name>", "mrn": "<MRN>", "dob": "<MM/DD/YYYY>", "age": <int>, "sex": "<Male|Female>", "insurance": "<payer/plan>", "pcp": "<referring provider, credentials>", "attending": "<rendering provider, credentials>", "facility": "<clinic/hospital>" },
+  "plan": [
+    { "dos": "<MM/DD/YYYY>", "type": "<History & Physical | Follow-up Progress Note | Procedure Note | Consultation>", "setting": "<Outpatient Clinic | Infusion Center | Wound Care Center | Inpatient | Neurodiagnostic Lab | etc.>", "reason": "<one-line chief complaint>", "focus": "<a precise clinical directive for THIS DOS: the exact diagnoses to document with their specificity elements (laterality, acuity, stage/grade/severity, causal linkage), the specific services/procedures/studies performed, and the distinguishing findings — enough that a writer can produce a coding-rich note that clearly differs from every other DOS>" }
+  ]
+}
+
+RULES:
+- EXACTLY ${encounters} plan entries, chronological, every DOS dated within 01/01/2026 through 03/31/2026, spaced realistically (days to weeks apart).
+- Each DOS must be genuinely DISTINCT: different reason, different examination focus, and DIFFERENT services performed (e.g. comprehensive H&P, then a procedure/operative note, then a results-management follow-up with therapy titration, then a consultation). Chronic problems carry forward and evolve.
+- Make it coding-rich and specialty-specific: the focus directives must name real, specific conditions and real services so the resulting notes exercise accurate ICD-10-CM, CPT/HCPCS, and modifier prediction (including at least one DOS where a significant, separately identifiable E/M accompanies a procedure, and document laterality/distinct-site facts where clinically true).
+- NO billing codes anywhere — describe everything in plain clinical words.
+- Avoid the stock "62-year-old with diabetes and hypertension" archetype; vary demographics, occupation, ethnicity, and presentation. Uniqueness token ${varietySeed} (do not print it).
+- Output valid JSON only.`
+
+    const scaffold = await callJson('gpt-4.1', 0.9, 1800, scaffoldSystem, `Design the ${specialtyLabel} patient and the ${encounters}-DOS plan now.`)
+    if (!scaffold.ok) return { status: 502, json: { error: `Could not plan the chart: ${scaffold.error}` } }
+
+    const patientObj = (scaffold.data.patient ?? {}) as Record<string, unknown>
     const patient = {
       name: str(patientObj.name),
       mrn: str(patientObj.mrn),
@@ -1407,24 +1510,69 @@ ABSOLUTE RULES:
       facility: str(patientObj.facility),
     }
 
-    const encountersOut = Array.isArray(parsed.encounters)
-      ? parsed.encounters
-          .map((e) => {
-            const o = (e ?? {}) as Record<string, unknown>
-            return {
-              dos: str(o.dos),
-              type: str(o.type),
-              setting: str(o.setting),
-              reason: str(o.reason),
-              page1: str(o.page1),
-              page2: str(o.page2),
-            }
-          })
-          .filter((e) => e.page1.length > 0 || e.page2.length > 0)
+    const plan = Array.isArray(scaffold.data.plan)
+      ? scaffold.data.plan.slice(0, encounters).map((p) => {
+          const o = (p ?? {}) as Record<string, unknown>
+          return { dos: str(o.dos), type: str(o.type), setting: str(o.setting), reason: str(o.reason), focus: str(o.focus) }
+        })
       : []
+    if (plan.length === 0) return { status: 502, json: { error: 'The model did not return a chart plan. Please try again.' } }
+
+    const patientHeader = `PATIENT: ${patient.name || 'Patient'} · MRN ${patient.mrn || '—'} · DOB ${patient.dob || '—'} · ${patient.age ?? '?'} ${patient.sex || ''} · Insurance ${patient.insurance || '—'} · Attending ${patient.attending || '—'} · Facility ${patient.facility || '—'}`
+    const courseOutline = plan.map((p, i) => `DOS ${i + 1} (${p.dos}) — ${p.type}: ${p.reason}`).join('\n')
+
+    // ---- Phase 2: write each DOS note. page1 (subjective/objective) and page2
+    // (data/assessment/plan) are written by SEPARATE GPT-4.1 calls, and ALL pages
+    // across ALL DOS run in parallel — so wall-clock stays roughly constant (one
+    // page's latency) regardless of how many DOS, keeping the full chart inside
+    // the serverless limit while each note stays rich (~1,200 words per DOS). ----
+    const codeFreeRule = `NO billing codes anywhere — no ICD-10/CPT/HCPCS/modifier numbers. Write every diagnosis and service in plain clinical WORDS only (e.g. "type 2 diabetes mellitus with diabetic chronic kidney disease, stage 3b"; "selective sharp debridement of devitalized tissue"). FULL SPECIFICITY for every diagnosis: laterality, acuity/episode, stage/grade/severity, and causal/manifestation linkage ("due to"/"with"/"secondary to"). No vague "labs unremarkable"/"exam normal"/"stable" — always the concrete values and findings. Keep everything CONSISTENT with the patient header and this DOS's clinical focus.`
+
+    const page1System = `You are a senior ${specialtyLabel} attending writing the SUBJECTIVE and OBJECTIVE portion (PAGE 1) of one authentic clinical note for a single date of service. It tests an automated coding engine, so it must be internally consistent, clinically accurate, and richly detailed.
+
+SPECIALTY GROUNDING (${specialtyLabel}): ${specialtyGuidance}
+
+Return ONLY strict JSON: { "page1": "<Markdown, ~650-750 words>" } containing, in order: a short header line (patient name / MRN / DOS / encounter type / setting / attending); Chief Complaint; History of Present Illness (several detailed paragraphs); Review of Systems (pertinent positives AND negatives); Past Medical History; Past Surgical History; Medications (name/dose/route/frequency with indication); Allergies; Social History; Family History; Vital Signs (every value a real number); and a comprehensive Physical Examination by system with concrete findings and measurements.
+
+${codeFreeRule}
+CODING-READY: surface the facts a coder needs — document the drivers of E/M level (number/complexity of problems, and, where appropriate, total encounter time including counseling/coordination), laterality and the specifics of any condition, and set up any procedure performed this DOS. Output valid JSON only.`
+
+    const page2System = `You are a senior ${specialtyLabel} attending writing the DATA / ASSESSMENT / PLAN portion (PAGE 2) of one authentic clinical note for a single date of service. It tests an automated coding engine, so it must be internally consistent, clinically accurate, and richly detailed.
+
+SPECIALTY GROUNDING (${specialtyLabel}): ${specialtyGuidance}
+
+Return ONLY strict JSON: { "page2": "<Markdown, ~550-650 words>" } containing, in order: Results / Data Reviewed (labs with numeric values and units and abnormal flags, imaging/pathology/studies described with concrete findings in prose); Assessment (a numbered problem list in clinical WORDS, each problem to full specificity with explicit clinical reasoning); Plan (per problem: medications with exact dose changes, diagnostics ordered, and every procedure/infusion/injection/debridement/study PERFORMED this DOS documented with all billable elements — site, laterality, technique, extent, size/measurements, number of units/lesions, agents with dose, start/stop or duration, and who performed it); Patient Education & Counseling; Disposition / Follow-up; and a provider attestation with electronic signature block.
+
+${codeFreeRule}
+CODING-READY: when clinically true, document in WORDS (never as a code suffix) the circumstances that justify modifiers — laterality; a significant, separately identifiable same-day E/M alongside a procedure; a distinct procedure at a separate site/session; staged/repeat services. Output valid JSON only.`
+
+    const dosContext = (p: (typeof plan)[number], i: number) =>
+      `${patientHeader}\n\nCOURSE OUTLINE (for consistency across the chart):\n${courseOutline}\n\nTHIS DATE OF SERVICE — DOS ${i + 1} of ${plan.length}\nDate of service: ${p.dos}\nEncounter type: ${p.type}\nSetting: ${p.setting}\nReason for visit: ${p.reason}\nClinical focus that MUST be documented this DOS: ${p.focus}`
+
+    const writePage = async (system: string, p: (typeof plan)[number], i: number, key: 'page1' | 'page2') => {
+      const user = `${dosContext(p, i)}\n\nWrite ${key} for this date of service now — richly detailed, specialty-specific, code-free.`
+      let r = await callJson('gpt-4.1', 0.6, 3200, system, user)
+      if ((!r.ok && r.truncated) || (r.ok && !str(r.data[key]))) {
+        r = await callJson('gpt-4.1', 0.55, 2600, system, `${user}\n\nKeep it within the target length so the JSON completes.`)
+      }
+      return r.ok ? str(r.data[key]) : ''
+    }
+
+    const written = await Promise.all(
+      plan.map(async (p, i) => {
+        const [page1, page2] = await Promise.all([
+          writePage(page1System, p, i, 'page1'),
+          writePage(page2System, p, i, 'page2'),
+        ])
+        return { dos: p.dos, type: p.type, setting: p.setting, reason: p.reason, page1, page2 }
+      }),
+    )
+    const encountersOut = written.filter(
+      (e): e is NonNullable<typeof e> => e !== null && (e.page1.length > 0 || e.page2.length > 0),
+    )
 
     if (encountersOut.length === 0) {
-      return { status: 502, json: { error: 'The model did not return any encounters.' } }
+      return { status: 502, json: { error: 'The chart notes could not be generated. Please try again.' } }
     }
 
     return { status: 200, json: { specialty: specialtyId, specialtyLabel, patient, encounters: encountersOut } }

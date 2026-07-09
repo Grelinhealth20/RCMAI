@@ -34,6 +34,8 @@ interface IcdBox extends ReviewMeta {
   description: string
   evidence: string
   verified: boolean
+  primary: boolean
+  rankLabel: string
 }
 interface CptBox extends ReviewMeta {
   code: string
@@ -51,11 +53,17 @@ interface ModBox extends ReviewMeta {
   rationale: string
 }
 
-const EMPTY_ICD: IcdBox = { code: '', description: '', evidence: '', verified: false, original: '', reviewedValue: '' }
+const EMPTY_ICD: IcdBox = { code: '', description: '', evidence: '', verified: false, primary: false, rankLabel: 'Primary', original: '', reviewedValue: '' }
 const EMPTY_CPT: CptBox = { code: '', description: '', evidence: '', units: '', modifiers: [], verified: false, mue: null, original: '', reviewedValue: '' }
 const EMPTY_MOD: ModBox = { modifier: '', description: '', appliesTo: '', rationale: '', original: '', reviewedValue: '' }
 
 type Sev = 'ok' | 'warning' | 'error' | 'none'
+
+/** Diagnosis submission-rank labels. The badge is derived from a diagnosis's
+ *  POSITION in the list (0 = primary, 1 = secondary, …) so ranks are always
+ *  unique and correct even after the user edits/reorders/removes a code. */
+const RANK_LABELS = ['Primary', 'Secondary', 'Tertiary', 'Quaternary', 'Quinary', 'Senary', 'Septenary', 'Octonary', 'Nonary', 'Denary']
+const rankLabelAt = (i: number): string => RANK_LABELS[i] ?? `Dx ${i + 1}`
 
 /** Before the first prediction, pad to `min` empty boxes so the 4-per-row grid
  *  is always visible; after a prediction the list is shown exactly (reduced to
@@ -380,6 +388,8 @@ function CodingEngine({ loadedChart = null, onCoded, onRequestNext, queuePositio
               description: c.description,
               evidence: c.evidence,
               verified: c.verified,
+              primary: c.primary,
+              rankLabel: c.rankLabel,
               original: c.code,
               reviewedValue: c.code,
             })),
@@ -581,6 +591,11 @@ function CodingEngine({ loadedChart = null, onCoded, onRequestNext, queuePositio
                   <CloseGlyph />
                 </button>
               </div>
+              {hasPredicted && entry.code.trim() && (
+                <span className={`ce-rank ${i === 0 ? 'ce-rank-primary' : 'ce-rank-secondary'}`}>
+                  {rankLabelAt(i)} Dx
+                </span>
+              )}
               {entry.description && (
                 <span className="ce-box-desc" title={entry.description}>
                   {entry.description}
@@ -890,6 +905,71 @@ function CodingEngine({ loadedChart = null, onCoded, onRequestNext, queuePositio
             {renderIcd()}
             {renderCpt()}
             {renderMods()}
+
+            {/* ---------- Coding rationale & compliance (below Modifiers) ---------- */}
+            {status === 'done' && prediction && (prediction.mappings.length > 0 || prediction.validations.length > 0) && (
+              <div className="ce-rationale">
+                {prediction.mappings.length > 0 && (
+                  <div className="ce-rat-block">
+                    <span className="ce-rat-title">ICD → CPT Mapping · Why These CPTs Are Coded</span>
+                    <span className="ce-rat-sub">
+                      Each CPT is linked to the diagnosis codes that establish its medical necessity, the coding
+                      rationale, and the verbatim documentation from the medical record that supports it.
+                    </span>
+                    <ul className="ce-map-list">
+                      {prediction.mappings.map((m, i) => (
+                        <li key={i} className="ce-map-item">
+                          <div className="ce-map-head">
+                            <span className="ce-map-cpt">{m.cpt}</span>
+                            <span className="ce-map-arrow" aria-hidden="true">←</span>
+                            {m.supportingDiagnoses.length > 0 ? (
+                              m.supportingDiagnoses.map((d) => (
+                                <span key={d} className="ce-map-dx">{d}</span>
+                              ))
+                            ) : (
+                              <span className="ce-map-dx ce-map-dx-none">no linked Dx</span>
+                            )}
+                          </div>
+                          {m.rationale && (
+                            <div className="ce-map-line">
+                              <span className="ce-map-line-label">Coding rationale</span>
+                              <span className="ce-map-why">{m.rationale}</span>
+                            </div>
+                          )}
+                          {m.recordEvidence && (
+                            <div className="ce-map-line ce-map-line-evidence">
+                              <span className="ce-map-line-label">Why coded · from the medical record</span>
+                              <span className="ce-map-evidence">“{m.recordEvidence}”</span>
+                            </div>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {prediction.validations.length > 0 && (
+                  <div className="ce-rat-block">
+                    <span className="ce-rat-title">Compliance Validation · LCD/NCD · NCCI PTP · MUE · Modifiers</span>
+                    <ul className="ce-val-list">
+                      {prediction.validations.map((v, i) => (
+                        <li key={i} className={`ce-val-item is-${v.status}`}>
+                          <span className="ce-val-edit">{v.edit}</span>
+                          <div className="ce-val-body">
+                            <span className="ce-val-name">
+                              {v.item}
+                              <span className="ce-val-status">
+                                {v.status === 'pass' ? '✓ Pass' : v.status === 'warning' ? '! Review' : '✕ Critical'}
+                              </span>
+                            </span>
+                            <span className="ce-val-detail">{v.detail}</span>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* CDI + CMS audit intelligence */}
             {status === 'done' && prediction && (prediction.cdi.length > 0 || prediction.audit.length > 0) && (

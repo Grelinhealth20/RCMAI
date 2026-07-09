@@ -7,6 +7,31 @@ export interface PredictedIcd {
   verified: boolean
   unspecified: boolean
   billable: boolean
+  /** The single primary diagnosis (chiefly responsible for the encounter). */
+  primary: boolean
+  /** 1-based submission rank (1 = primary, 2 = secondary, 3 = tertiary, …). */
+  rank: number
+  /** Human label for the rank ("Primary", "Secondary", "Tertiary", …). */
+  rankLabel: string
+}
+
+/** Why a CPT is coded, the record evidence that proves it, and the diagnoses
+ *  that establish its medical necessity. */
+export interface CodeMapping {
+  cpt: string
+  /** Coding logic / level-of-care justification. */
+  rationale: string
+  /** Verbatim quote from the record documenting the service (payer/auditor view). */
+  recordEvidence: string
+  supportingDiagnoses: string[]
+}
+
+/** A deterministic compliance check (NCCI · MUE · LCD/NCD · Modifier). */
+export interface ValidationCheck {
+  edit: string
+  status: 'pass' | 'warning' | 'critical'
+  item: string
+  detail: string
 }
 
 export interface PredictedCpt {
@@ -53,6 +78,8 @@ export interface CodingPrediction {
   icdCodes: PredictedIcd[]
   cptCodes: PredictedCpt[]
   modifiers: PredictedModifier[]
+  mappings: CodeMapping[]
+  validations: ValidationCheck[]
   audit: AuditFinding[]
 }
 
@@ -64,6 +91,8 @@ interface RawResponse {
   icdCodes?: unknown
   cptCodes?: unknown
   modifiers?: unknown
+  mappings?: unknown
+  validations?: unknown
   audit?: unknown
   error?: unknown
 }
@@ -76,7 +105,7 @@ const asStrArr = (v: unknown): string[] =>
 const readIcd = (v: unknown): PredictedIcd[] => {
   if (!Array.isArray(v)) return []
   return v
-    .map((item) => {
+    .map((item, idx) => {
       const o = (item ?? {}) as Record<string, unknown>
       return {
         code: asText(o.code),
@@ -85,9 +114,39 @@ const readIcd = (v: unknown): PredictedIcd[] => {
         verified: asBool(o.verified),
         unspecified: asBool(o.unspecified),
         billable: o.billable !== false,
+        primary: asBool(o.primary),
+        rank: typeof o.rank === 'number' && Number.isFinite(o.rank) ? o.rank : idx + 1,
+        rankLabel: asText(o.rankLabel) || (idx === 0 ? 'Primary' : idx === 1 ? 'Secondary' : idx === 2 ? 'Tertiary' : `Dx ${idx + 1}`),
       }
     })
     .filter((c) => c.code.length > 0)
+}
+
+const readMappings = (v: unknown): CodeMapping[] => {
+  if (!Array.isArray(v)) return []
+  return v
+    .map((item) => {
+      const o = (item ?? {}) as Record<string, unknown>
+      return {
+        cpt: asText(o.cpt),
+        rationale: asText(o.rationale),
+        recordEvidence: asText(o.recordEvidence),
+        supportingDiagnoses: asStrArr(o.supportingDiagnoses),
+      }
+    })
+    .filter((m) => m.cpt.length > 0)
+}
+
+const readValidations = (v: unknown): ValidationCheck[] => {
+  if (!Array.isArray(v)) return []
+  return v
+    .map((item) => {
+      const o = (item ?? {}) as Record<string, unknown>
+      const status: ValidationCheck['status'] =
+        o.status === 'pass' || o.status === 'warning' || o.status === 'critical' ? o.status : 'pass'
+      return { edit: asText(o.edit), status, item: asText(o.item), detail: asText(o.detail) }
+    })
+    .filter((c) => c.item.length > 0)
 }
 
 const readCpt = (v: unknown): PredictedCpt[] => {
@@ -195,6 +254,8 @@ export async function predictCoding(
     icdCodes: readIcd(data.icdCodes),
     cptCodes: readCpt(data.cptCodes),
     modifiers: readModifiers(data.modifiers),
+    mappings: readMappings(data.mappings),
+    validations: readValidations(data.validations),
     audit: readAudit(data.audit),
   }
 }

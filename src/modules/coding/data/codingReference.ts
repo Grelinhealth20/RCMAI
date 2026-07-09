@@ -32,6 +32,17 @@
  * grounds and verifies it.
  */
 
+import { ONC_ICD_ROWS, ONC_CPT_ROWS, ONC_NCCI, ONC_POLICIES } from './oncologyDataset.js'
+import { WND_ICD_ROWS, WND_CPT_ROWS, WND_NCCI, WND_POLICIES } from './woundCareDataset.js'
+import { IM_ICD_ROWS, IM_CPT_ROWS, IM_NCCI, IM_POLICIES } from './internalMedicineDataset.js'
+import { NEU_ICD_ROWS, NEU_CPT_ROWS, NEU_NCCI, NEU_POLICIES } from './neurologyDataset.js'
+// Expansion packs — additional real ICD-10-CM / CPT / HCPCS codes, NCCI edits and
+// LCD/NCD policies per specialty (deduped on merge; grounding stays capped).
+import { ONC_ICD_EXT, ONC_CPT_EXT, ONC_NCCI_EXT, ONC_POLICIES_EXT } from './expansions/oncologyExpansion.js'
+import { WND_ICD_EXT, WND_CPT_EXT, WND_NCCI_EXT, WND_POLICIES_EXT } from './expansions/woundCareExpansion.js'
+import { IM_ICD_EXT, IM_CPT_EXT, IM_NCCI_EXT, IM_POLICIES_EXT } from './expansions/internalMedicineExpansion.js'
+import { NEU_ICD_EXT, NEU_CPT_EXT, NEU_NCCI_EXT, NEU_POLICIES_EXT } from './expansions/neurologyExpansion.js'
+
 export type Specialty = 'internal-medicine' | 'oncology' | 'wound-care' | 'neurology'
 
 export const SPECIALTIES: { id: Specialty; label: string }[] = [
@@ -938,6 +949,23 @@ export const COVERAGE_POLICIES: CoveragePolicy[] = [
 ]
 
 /* ============================================================================
+ * Merge the expanded Oncology dataset (real ICDs/CPTs/NCCI/LCD-NCD) into the
+ * master reference so lookups, MUE/NCCI/LCD validation, and grounding all cover
+ * the full oncology code set.
+ * ==========================================================================*/
+ICD_ROWS.push(...ONC_ICD_ROWS, ...WND_ICD_ROWS, ...IM_ICD_ROWS, ...NEU_ICD_ROWS)
+CPT_ROWS.push(...ONC_CPT_ROWS, ...WND_CPT_ROWS, ...IM_CPT_ROWS, ...NEU_CPT_ROWS)
+NCCI_EDITS.push(...ONC_NCCI, ...WND_NCCI, ...IM_NCCI, ...NEU_NCCI)
+COVERAGE_POLICIES.push(...ONC_POLICIES, ...WND_POLICIES, ...IM_POLICIES, ...NEU_POLICIES)
+
+// Expansion packs appended after the curated core so the core keeps grounding
+// priority; these broaden verification/validation coverage and the long tail.
+ICD_ROWS.push(...ONC_ICD_EXT, ...WND_ICD_EXT, ...IM_ICD_EXT, ...NEU_ICD_EXT)
+CPT_ROWS.push(...ONC_CPT_EXT, ...WND_CPT_EXT, ...IM_CPT_EXT, ...NEU_CPT_EXT)
+NCCI_EDITS.push(...ONC_NCCI_EXT, ...WND_NCCI_EXT, ...IM_NCCI_EXT, ...NEU_NCCI_EXT)
+COVERAGE_POLICIES.push(...ONC_POLICIES_EXT, ...WND_POLICIES_EXT, ...IM_POLICIES_EXT, ...NEU_POLICIES_EXT)
+
+/* ============================================================================
  * Derived lookups
  * ==========================================================================*/
 
@@ -977,12 +1005,44 @@ export function lookupModifier(mod: string): ModifierRef | undefined {
   return MODIFIER_REFERENCE.find((r) => r.modifier.toUpperCase() === m)
 }
 
-/** All reference codes/policies relevant to a specialty, for prompt grounding. */
-export function referenceForSpecialty(specialty: Specialty) {
+/**
+ * A bounded, de-duplicated slice of the specialty reference for prompt grounding.
+ * The FULL code set still powers validation (via ICD_MAP/CPT_MAP/NCCI/policies);
+ * grounding is capped so the prediction prompt stays real-time even for large
+ * specialties (e.g. oncology's several-hundred-code set). Guidance, not a
+ * whitelist — the model may use any valid code the record supports.
+ */
+export function referenceForSpecialty(specialty: Specialty, icdLimit = 200, cptLimit = 140) {
+  const icdSeen = new Set<string>()
+  const icd: { code: string; description: string }[] = []
+  for (const [code, description, , , sp] of ICD_ROWS) {
+    if (!sp.includes(specialty)) continue
+    const key = code.toUpperCase()
+    if (icdSeen.has(key)) continue
+    icdSeen.add(key)
+    icd.push({ code, description })
+    if (icd.length >= icdLimit) break
+  }
+
+  const cptSeen = new Set<string>()
+  const cpt: { code: string; description: string; mue: number }[] = []
+  for (const [code, description, mue, sp] of CPT_ROWS) {
+    if (!sp.includes(specialty)) continue
+    const key = code.toUpperCase()
+    if (cptSeen.has(key)) continue
+    cptSeen.add(key)
+    cpt.push({ code, description, mue })
+    if (cpt.length >= cptLimit) break
+  }
+
+  // Only NCCI edits touching a grounded CPT (keeps the prompt focused).
+  const cptKeys = cptSeen
+  const ncci = NCCI_EDITS.filter((e) => cptKeys.has(e.column1) || cptKeys.has(e.column2))
+
   return {
-    icd: ICD_ROWS.filter(([, , , , sp]) => sp.includes(specialty)).map(([code, description]) => ({ code, description })),
-    cpt: CPT_ROWS.filter(([, , , sp]) => sp.includes(specialty)).map(([code, description, mue]) => ({ code, description, mue })),
-    ncci: NCCI_EDITS,
+    icd,
+    cpt,
+    ncci,
     modifiers: MODIFIER_REFERENCE.map((m) => ({ modifier: m.modifier, description: m.description })),
     policies: COVERAGE_POLICIES.filter((p) => p.specialty === specialty).map((p) => ({
       policyId: p.policyId,

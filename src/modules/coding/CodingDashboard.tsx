@@ -6,7 +6,7 @@ import './CodingDashboard.css'
 
 type Status = 'idle' | 'loading' | 'done' | 'error'
 
-const ENCOUNTER_OPTIONS = [1, 2, 3, 4, 5, 6]
+const ENCOUNTER_OPTIONS = [1, 2, 3, 4]
 
 function CodingDashboard() {
   const [specialty, setSpecialty] = useState<Specialty>('internal-medicine')
@@ -109,9 +109,9 @@ function CodingDashboard() {
         </div>
 
         <p className="crg-hint">
-          <strong>{dosCount} unique {dosCount === 1 ? 'encounter' : 'encounters'}</strong> · each a comprehensive
-          1,500+ word clinical note documented to support accurate ICD, CPT &amp; modifier prediction. No codes are
-          written into the note.
+          <strong>{dosCount} unique {dosCount === 1 ? 'encounter' : 'encounters'}</strong> · each a detailed
+          clinical note documented to support accurate ICD, CPT &amp; modifier prediction. No codes are written into
+          the note.
         </p>
 
         <button type="button" className="crg-generate" onClick={generate} disabled={status === 'loading'}>
